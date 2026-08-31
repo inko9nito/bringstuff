@@ -99,6 +99,9 @@
       add_all: 'Add all',
       default_list_name: 'Bring list',
       change_name: 'Change name',
+      you_are_title: 'Your name',
+      you_are_hint: "Your name is remembered on this device and shown next to items you're bringing.",
+      field_your_name: 'Name',
     },
     ru: {
       brand: 'BringStuff',
@@ -117,6 +120,9 @@
       filter_mine: 'Моё',
       filter_taken: 'Занято',
       change_name: 'Изменить имя',
+      you_are_title: 'Твоё имя',
+      you_are_hint: 'Имя сохраняется на этом устройстве и показывается рядом с тем, что ты везёшь.',
+      field_your_name: 'Имя',
       add_item_ph: 'Добавить…',
       qty_ph: 'Кол.',
       paste_list: 'Вставить список…',
@@ -538,12 +544,10 @@
     meSaveBtn.addEventListener('click', saveMe);
     meInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveMe(); meInput.blur(); } });
     meInput.addEventListener('blur', saveMe);
-    meChip.addEventListener('click', () => {
-      meRow.hidden = false;
-      meChip.hidden = true;
-      // wait a tick for hidden to unset, then focus
-      setTimeout(() => { meInput.focus(); meInput.select(); }, 0);
-    });
+    // Issue #17: tapping the chip opens a push panel instead of
+    // revealing the inline field — that felt out of place appearing
+    // between the title and the list.
+    meChip.addEventListener('click', () => openNameView(updateMeChip));
 
     $('#btn-back').addEventListener('click', () => navHome());
     $('#btn-share').addEventListener('click', () => openShareSheet());
@@ -878,6 +882,30 @@
     setTimeout(done, 400);
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.panel) closePanel(); });
+
+  function openNameView(onSave) {
+    openPanel('tpl-name-view', ({ panel, close }) => {
+      panel.querySelector('.back-label').textContent = state.list?.name || t('nav_lists');
+      const input = panel.querySelector('#name-input');
+      input.value = state.me || '';
+      // Focus after the slide-in animation so the keyboard doesn't
+      // fight the transform.
+      setTimeout(() => { input.focus(); input.select(); }, 200);
+
+      const save = () => {
+        state.me = input.value.trim();
+        setMe(state.me);
+        if (onSave) onSave();
+        renderItems();
+        updateSelectionBar();
+        close();
+      };
+      panel.querySelector('[data-confirm]').addEventListener('click', save);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); save(); }
+      });
+    });
+  }
 
   function openItemView(id) {
     const it = state.list.items.find(x => x.id === id);

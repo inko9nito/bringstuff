@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="theme-color" content="#F1F0F5" media="(prefers-color-scheme: light)" />
@@ -176,6 +176,30 @@
         <label class="field-label" data-t="field_bringing"></label>
         <div class="assignee-editor" id="assignee-editor"></div>
         <button class="row-button destructive" id="btn-delete" data-t="delete_item"></button>
+      </main>
+    </div>
+  </template>
+
+  <!-- Name push panel (iOS-style "You are" editor) -->
+  <template id="tpl-name-view">
+    <div class="push-panel" role="dialog" aria-modal="true">
+      <header class="topbar push-topbar">
+        <div class="topbar-inner">
+          <button class="nav-btn tint" data-close>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            <span class="back-label"></span>
+          </button>
+          <div class="spacer"></div>
+          <button class="nav-btn tint save-btn" data-confirm><b data-t="save"></b></button>
+        </div>
+        <div class="topbar-title-row">
+          <h1 class="large-title" data-t="you_are_title"></h1>
+        </div>
+      </header>
+      <main class="scroll push-body">
+        <p class="sheet-hint" data-t="you_are_hint"></p>
+        <label class="field-label" data-t="field_your_name"></label>
+        <input class="row-input solo" id="name-input" type="text" autocapitalize="words" data-t-placeholder="your_name_ph" />
       </main>
     </div>
   </template>

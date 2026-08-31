@@ -68,7 +68,11 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  /* Kill iOS double-tap zoom on tappable elements — Safari ignores
+     user-scalable=no unless every interactive element also opts out. */
+  touch-action: manipulation;
 }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 html, body {
   margin: 0;
@@ -220,7 +224,8 @@ input:focus, textarea:focus, [contenteditable]:focus {
   border: 0;
   border-radius: var(--radius-pill);
   padding: 10px 16px;
-  font-size: 15px;
+  /* iOS auto-zooms into any input <16px on focus; keep everything ≥16 */
+  font-size: 16px;
   font-weight: 500;
   min-width: 0;
   box-shadow: var(--shadow);
@@ -313,6 +318,12 @@ input:focus, textarea:focus, [contenteditable]:focus {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 0 0 calc(120px + var(--safe-bottom)) 0;
+}
+/* Give every top-level card inside a scroll area a real horizontal gutter,
+   so lists don't touch the viewport edges (issue #13). */
+.scroll > .card {
+  margin-left: max(16px, var(--safe-left));
+  margin-right: max(16px, var(--safe-right));
 }
 
 /* ---------- Hero (home) ---------- */
@@ -521,7 +532,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
   background: var(--fill-tertiary);
   border: 0;
   border-radius: var(--radius-pill);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   text-align: center;
   -moz-appearance: textfield;
@@ -772,7 +783,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
   background: var(--surface);
   border-radius: var(--radius-pill);
   border: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   box-shadow: var(--shadow);
   min-width: 0;
@@ -783,7 +794,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
   background: var(--surface);
   border-radius: var(--radius-pill);
   border: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   text-align: center;
   box-shadow: var(--shadow);
