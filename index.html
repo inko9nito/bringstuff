@@ -216,6 +216,36 @@
     </div>
   </template>
 
+  <!-- Assignee edit push panel (opens over item detail) -->
+  <template id="tpl-assignee-view">
+    <div class="push-panel assignee-edit-panel" role="dialog" aria-modal="true">
+      <header class="topbar push-topbar">
+        <div class="topbar-inner">
+          <button class="nav-btn tint" data-close>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            <span class="back-label" data-t="back_to_item"></span>
+          </button>
+          <div class="spacer"></div>
+          <button class="save-btn-primary" data-confirm data-t="save"></button>
+        </div>
+      </header>
+      <main class="scroll push-body">
+        <div class="ae-topline">
+          <div class="ae-topline-name">
+            <label class="field-label" data-t="ae_name_ph"></label>
+            <input class="row-input solo" id="ae-edit-name" type="text" autocapitalize="words" />
+          </div>
+          <div class="ae-topline-qty">
+            <label class="field-label" data-t="ae_qty_label"></label>
+            <input class="row-input solo" id="ae-edit-qty" type="number" min="1" inputmode="numeric" data-t-placeholder="ae_qty_ph" />
+          </div>
+        </div>
+        <label class="field-label" data-t="ae_detail_label"></label>
+        <textarea class="ae-note-area" id="ae-edit-note" rows="6" data-t-placeholder="ae_note_ph"></textarea>
+      </main>
+    </div>
+  </template>
+
   <!-- Bulk actions sheet (selection overflow) -->
   <template id="tpl-bulk-actions-sheet">
     <div class="sheet-backdrop"></div>

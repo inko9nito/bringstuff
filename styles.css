@@ -141,7 +141,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px max(12px, var(--safe-left)) 4px max(12px, var(--safe-right));
+  padding: 4px max(12px, var(--safe-left)) 12px max(12px, var(--safe-right));
 }
 .topbar-inner .spacer { flex: 1; }
 .nav-btn {
@@ -458,7 +458,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
   align-items: center;
   gap: 10px;
   padding: 6px 14px;
-  min-height: 46px;
+  min-height: 42px;
   position: relative;
 }
 .row.single-line {
@@ -472,10 +472,14 @@ input:focus, textarea:focus, [contenteditable]:focus {
 
 .check {
   flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
+  /* Align to the first line of the title (matters when a row grows
+     with per-assignee notes below), sized smaller for a lighter row. */
+  align-self: flex-start;
+  margin-top: 8px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  border: 1.75px solid var(--label-quaternary);
+  border: 1.5px solid var(--label-quaternary);
   background: transparent;
   display: inline-flex;
   align-items: center;
@@ -514,7 +518,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
 }
 .row-title {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--label);
   word-wrap: break-word;
   overflow-wrap: anywhere;
@@ -694,14 +698,13 @@ input:focus, textarea:focus, [contenteditable]:focus {
   to { transform: translateY(0); opacity: 1; }
 }
 .sel-count {
-  flex: 1;
+  flex: 0 0 auto;
   color: var(--label-secondary);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0 10px 0 6px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .pill {
   padding: 9px 16px;
@@ -935,6 +938,106 @@ input:focus, textarea:focus, [contenteditable]:focus {
   font-size: 14px;
 }
 
+/* Issue #44: view-only assignee rows with edit + delete actions. */
+.assignee-editor .ae-row-view {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px 10px 14px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.assignee-editor .ae-view-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.assignee-editor .ae-view-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 3px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--a-bg, var(--fill-tertiary));
+  color: var(--a-fg, var(--label));
+  max-width: 100%;
+}
+.assignee-editor .ae-view-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.assignee-editor .ae-view-qty {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+  font-weight: 700;
+}
+.assignee-editor .ae-empty {
+  color: var(--label-tertiary);
+  font-weight: 500;
+  font-style: italic;
+}
+.assignee-editor .ae-view-note {
+  color: var(--label-secondary);
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 0 4px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.assignee-editor .ae-view-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--label-secondary);
+  background: var(--fill-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.assignee-editor .ae-view-btn:active { opacity: 0.7; transform: scale(0.94); }
+.assignee-editor .ae-view-del { color: var(--danger); }
+
+/* Assignee-edit push panel (Issue #44) */
+.ae-topline {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.ae-topline-name { flex: 1; min-width: 0; }
+.ae-topline-qty { flex: 0 0 96px; }
+.ae-topline-qty .row-input.solo { text-align: center; }
+.ae-note-area {
+  width: 100%;
+  min-height: 180px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 0;
+  box-shadow: var(--shadow);
+  font-size: 16px;
+  line-height: 1.45;
+  font-family: inherit;
+  color: var(--label);
+  resize: vertical;
+}
+.ae-note-area::placeholder { color: var(--label-tertiary); }
+.push-topbar .nav-btn.tint .back-label {
+  font-size: 17px;
+  font-weight: 500;
+}
+
 /* ---------- Push panel (iOS-style item detail) ---------- */
 .push-panel {
   position: fixed;
@@ -1084,19 +1187,28 @@ input:focus, textarea:focus, [contenteditable]:focus {
   white-space: nowrap;
 }
 
-/* Selection-bar overflow button (Issue #8) */
+/* Selection-bar overflow button (Issue #8, #43): a plain 36px circle. */
 .pill.overflow {
-  padding: 6px 10px;
-  min-width: 40px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--label-secondary);
+  border-radius: 50%;
 }
 .pill.overflow svg { display: block; }
-/* On narrow screens the assign pill can push the count off — let the
-   count shrink first so both action pills stay tappable. */
-.selection-bar .sel-count { min-width: 0; }
+/* Let the primary assign pill shrink its text so the overflow circle
+   stays fully on-screen and tappable on narrow phones. */
+.selection-bar .pill.primary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.selection-bar { flex-wrap: nowrap; }
 @media (min-width: 720px) {
   .push-panel {
     max-width: 640px;

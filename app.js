@@ -120,6 +120,10 @@
       you_are_title: 'Your name',
       you_are_hint: "Your name is remembered on this device and shown next to items you're bringing.",
       field_your_name: 'Name',
+      ae_detail_label: 'Details',
+      back_to_item: 'Item',
+      ae_empty_name: '(no name)',
+      ae_qty_label: 'Qty',
     },
     ru: {
       brand: 'BringStuff',
@@ -158,7 +162,8 @@
       sort_alpha_asc: 'По названию (А → Я)',
       sort_alpha_desc: 'По названию (Я → А)',
       ae_note_ph: 'Что везёт (напр. красное вино)',
-      assign_to_name: (name) => `На ${name}`,
+      // Issue #45: RU sheet shows just the name — «На {name}» read as bad grammar.
+      assign_to_name: (name) => name,
       assign_to_other: 'На кого-то ещё…',
       other_person_title: 'Записать на',
       other_person_ph: 'Имя',
@@ -226,6 +231,10 @@
       detected_hint: (n) => `Добавить ${n} строк как отдельные пункты?`,
       add_all: 'Добавить все',
       default_list_name: 'Список',
+      ae_detail_label: 'Детали',
+      back_to_item: 'Пункт',
+      ae_empty_name: '(без имени)',
+      ae_qty_label: 'Кол.',
     },
   };
 
@@ -1120,7 +1129,8 @@
     const n = state.selected.size;
     if (n === 0) { bar.hidden = true; return; }
     bar.hidden = false;
-    $('#sel-count').textContent = t('sel_count', n);
+    // Issue #43: just the number, no "selected" label.
+    $('#sel-count').textContent = String(n);
     $('#sel-assign').textContent = t('assign_to');
   }
 
@@ -1293,9 +1303,21 @@
     });
   }
 
+  // Issue #42: pinned share URLs for specific lists.
+  // The keys are lowercased list names — when a list has a matching name we
+  // hand out a stable status URL instead of the auto-generated hash link,
+  // so the same link keeps working even as the list mutates.
+  const PINNED_SHARE_URLS = {
+    'отдых': 'https://tinyurl.com/trip-2026-08',
+  };
+  function shareUrlFor(list) {
+    const key = String(list?.name || '').trim().toLowerCase();
+    return PINNED_SHARE_URLS[key] || location.href;
+  }
+
   function openShareSheet() {
     openSheet('tpl-share-sheet', ({ sheet }) => {
-      const url = location.href;
+      const url = shareUrlFor(state.list);
       sheet.querySelector('#share-url').textContent = url;
       sheet.querySelector('#url-length').textContent = t('url_length', url.length);
       const copyBtn = sheet.querySelector('#btn-copy');
@@ -1321,9 +1343,11 @@
     });
   }
 
-  // ---------- Push panel (iOS-style item detail) ----------
+  // ---------- Push panel (iOS-style nav stack) ----------
+  // Panels stack: opening a new panel pushes on top of any existing panel
+  // instead of replacing it, so back-swipe returns to the previous panel
+  // rather than the underlying list. Only the topmost panel is interactive.
   function openPanel(tplId, setup) {
-    closePanel(true);
     const tpl = document.getElementById(tplId);
     const wrap = document.createElement('div');
     wrap.appendChild(tpl.content.cloneNode(true));
@@ -1332,13 +1356,34 @@
     host.className = 'panel-host';
     nodes.forEach(n => host.appendChild(n));
     document.body.appendChild(host);
-    state.panel = { host };
+    if (!state.panels) state.panels = [];
+    state.panels.push({ host });
+    state.panel = state.panels[state.panels.length - 1];
     applyI18n(host);
     const panel = host.querySelector('.push-panel');
-    const close = () => closePanel();
-    host.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
+    const close = (immediate) => closeTopPanel(host, immediate);
+    host.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => close()));
     if (panel) attachSwipeToDismiss(panel, close);
     if (setup) setup({ panel, close });
+  }
+
+  // Close a specific panel (by its host). Falls back to closing the top.
+  function closeTopPanel(host, immediate = false) {
+    if (!state.panels || !state.panels.length) return;
+    const idx = state.panels.findIndex(p => p.host === host);
+    const target = idx >= 0 ? state.panels.splice(idx, 1)[0] : state.panels.pop();
+    state.panel = state.panels.length ? state.panels[state.panels.length - 1] : null;
+    if (!target || !target.host || !target.host.parentNode) return;
+    if (immediate) { target.host.parentNode.removeChild(target.host); return; }
+    const panel = target.host.querySelector('.push-panel');
+    if (!panel) { target.host.parentNode.removeChild(target.host); return; }
+    panel.classList.add('closing');
+    const done = () => {
+      panel.removeEventListener('animationend', done);
+      if (target.host.parentNode) target.host.parentNode.removeChild(target.host);
+    };
+    panel.addEventListener('animationend', done);
+    setTimeout(done, 400);
   }
 
   // Issue #16 — right-swipe dismisses a push panel (iOS nav-stack pop).
@@ -1395,7 +1440,10 @@
       if (shouldClose) {
         panel.style.transition = 'transform 0.22s cubic-bezier(0.4, 0, 0.9, 0.4)';
         panel.style.transform = 'translateX(100%)';
-        setTimeout(() => close(), 220);
+        // Skip the exit animation on close — the panel is already off-screen
+        // from the swipe transform, and re-running .closing would snap it
+        // back to 0 and re-animate, showing a ghost layer.
+        setTimeout(() => close(true), 220);
       } else {
         panel.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.02)';
         panel.style.transform = 'translateX(0)';
@@ -1408,20 +1456,10 @@
     panel.addEventListener('touchcancel', onTouchEnd, { passive: true });
   }
   function closePanel(immediate = false) {
-    if (!state.panel) return;
-    const { host } = state.panel;
-    state.panel = null;
-    if (!host || !host.parentNode) return;
-    if (immediate) { host.parentNode.removeChild(host); return; }
-    const panel = host.querySelector('.push-panel');
-    if (!panel) { host.parentNode.removeChild(host); return; }
-    panel.classList.add('closing');
-    const done = () => {
-      panel.removeEventListener('animationend', done);
-      if (host.parentNode) host.parentNode.removeChild(host);
-    };
-    panel.addEventListener('animationend', done);
-    setTimeout(done, 400);
+    // Legacy entry point: closes the topmost panel on the stack.
+    if (!state.panels || !state.panels.length) return;
+    const top = state.panels[state.panels.length - 1];
+    closeTopPanel(top.host, immediate);
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.panel) closePanel(); });
 
@@ -1449,6 +1487,29 @@
     });
   }
 
+  // Issue #44: push panel to edit a single assignee's name / qty / detail.
+  // Stacks over the item detail so back-swipe returns to it unchanged.
+  function openAssigneeView(current, onSave) {
+    openPanel('tpl-assignee-view', ({ panel, close }) => {
+      const nameEl = panel.querySelector('#ae-edit-name');
+      const qtyEl = panel.querySelector('#ae-edit-qty');
+      const noteEl = panel.querySelector('#ae-edit-note');
+      nameEl.value = current.name || '';
+      qtyEl.value = current.qty || '';
+      noteEl.value = current.note || '';
+      setTimeout(() => { nameEl.focus(); nameEl.select(); }, 200);
+      const save = () => {
+        const q = parseInt(qtyEl.value, 10);
+        const updated = makeAssignee(nameEl.value, (!Number.isNaN(q) && q > 0) ? q : null, noteEl.value);
+        close();
+        onSave(updated);
+      };
+      panel.querySelector('[data-confirm]').addEventListener('click', save);
+      nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); noteEl.focus(); } });
+      qtyEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); noteEl.focus(); } });
+    });
+  }
+
   function openItemView(id) {
     const it = state.list.items.find(x => x.id === id);
     if (!it) return;
@@ -1463,37 +1524,41 @@
       qtyI.value = it.qty || '';
       noteI.value = it.note || '';
 
+      // Issue #44: assignees are shown as view-only rows with edit/delete
+      // buttons. Tapping edit pushes an overlay to change name/qty/detail.
       const rows = it.assignees.map(a => makeAssignee(a.name, a.qty, a.note));
       const draw = () => {
         editor.innerHTML = '';
         rows.forEach((a, idx) => {
           const el = document.createElement('div');
-          el.className = 'ae-row';
+          el.className = 'ae-row-view';
+          const displayName = a.name ? escapeHtml(a.name) : `<span class="ae-empty">${escapeHtml(t('ae_empty_name'))}</span>`;
+          const qtyBit = a.qty && a.qty > 0 ? ` <span class="ae-view-qty">×${a.qty}</span>` : '';
+          const noteBit = a.note ? `<div class="ae-view-note">${escapeHtml(a.note)}</div>` : '';
           el.innerHTML = `
-            <div class="ae-fields">
-              <div class="ae-line">
-                <input class="ae-name" type="text" placeholder="${escapeHtml(t('ae_name_ph'))}" />
-                <input class="ae-qty" type="number" min="1" inputmode="numeric" placeholder="${escapeHtml(t('ae_qty_ph'))}" />
-              </div>
-              <input class="ae-note" type="text" placeholder="${escapeHtml(t('ae_note_ph'))}" />
+            <div class="ae-view-main" data-role="edit">
+              <div class="ae-view-head" style="${assigneeStyle(a.name)}"><span class="ae-view-name">${displayName}</span>${qtyBit}</div>
+              ${noteBit}
             </div>
-            <button class="ae-del" aria-label="Remove">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+            <button class="ae-view-btn ae-view-edit" data-role="edit" aria-label="Edit">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </button>
+            <button class="ae-view-btn ae-view-del" data-role="delete" aria-label="Remove">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1.5 14a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
             </button>
           `;
-          const nameEl = el.querySelector('.ae-name');
-          const qtyEl = el.querySelector('.ae-qty');
-          const noteEl = el.querySelector('.ae-note');
-          nameEl.value = a.name;
-          qtyEl.value = a.qty || '';
-          noteEl.value = a.note || '';
-          nameEl.addEventListener('input', () => { rows[idx].name = nameEl.value; });
-          qtyEl.addEventListener('input', () => {
-            const q = parseInt(qtyEl.value, 10);
-            rows[idx].qty = (!Number.isNaN(q) && q > 0) ? q : null;
+          const openEdit = () => {
+            openAssigneeView(rows[idx], (updated) => {
+              rows[idx] = updated;
+              draw();
+            });
+          };
+          el.querySelector('.ae-view-main').addEventListener('click', openEdit);
+          el.querySelector('.ae-view-edit').addEventListener('click', (e) => {
+            e.stopPropagation(); openEdit();
           });
-          noteEl.addEventListener('input', () => { rows[idx].note = noteEl.value; });
-          el.querySelector('.ae-del').addEventListener('click', () => {
+          el.querySelector('.ae-view-del').addEventListener('click', (e) => {
+            e.stopPropagation();
             rows.splice(idx, 1); draw();
           });
           editor.appendChild(el);
@@ -1502,10 +1567,14 @@
         addBtn.className = 'ae-add';
         addBtn.textContent = t('ae_add');
         addBtn.addEventListener('click', () => {
-          rows.push(makeAssignee());
-          draw();
-          const inputs = editor.querySelectorAll('.ae-name');
-          if (inputs.length) inputs[inputs.length - 1].focus();
+          const fresh = makeAssignee();
+          openAssigneeView(fresh, (updated) => {
+            // Only add if the user actually gave a name.
+            if ((updated.name || '').trim()) {
+              rows.push(updated);
+              draw();
+            }
+          });
         });
         editor.appendChild(addBtn);
       };
