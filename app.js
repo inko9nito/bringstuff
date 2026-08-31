@@ -276,9 +276,15 @@
   }
 
   // ---------- Color hashing for assignee pills ----------
+  // The hash below can land two names within a few degrees of each other
+  // (e.g. "Лидия" and "Вера" both fell in the purple range) — this table
+  // nudges a specific name to a distinct hue without touching the hash
+  // for anyone else.
+  const ASSIGNEE_HUE_OVERRIDES = { 'лидия': 140 };
   function hueFor(name) {
     const s = String(name || '').trim().toLowerCase();
     if (!s) return 0;
+    if (s in ASSIGNEE_HUE_OVERRIDES) return ASSIGNEE_HUE_OVERRIDES[s];
     let h = 5381;
     for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
     return h % 360;
