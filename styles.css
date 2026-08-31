@@ -1224,8 +1224,14 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .selection-bar { flex-wrap: nowrap; }
 @media (min-width: 720px) {
   .push-panel {
+    /* Issue #76: left:50% alone still leaves the inset:0 base rule's
+       right:0 in play, so the panel resolved to half the viewport instead
+       of filling up to the cap. Pin width explicitly so it fills like the
+       rest of the app, just clamped and centered on wide viewports. */
+    width: 100%;
     max-width: 640px;
     left: 50%;
+    right: auto;
     transform: translateX(-50%);
     animation: pushInCentered 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.02);
     border-left: 0.5px solid var(--separator);
