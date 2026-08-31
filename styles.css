@@ -136,12 +136,12 @@ input:focus, textarea:focus, [contenteditable]:focus {
   border-bottom-color: var(--separator);
 }
 .topbar-inner {
-  min-height: 48px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px max(12px, var(--safe-left)) 6px max(12px, var(--safe-right));
+  padding: 4px max(12px, var(--safe-left)) 4px max(12px, var(--safe-right));
 }
 .topbar-inner .spacer { flex: 1; }
 .nav-btn {
@@ -149,22 +149,31 @@ input:focus, textarea:focus, [contenteditable]:focus {
   align-items: center;
   gap: 4px;
   color: var(--label);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
-  padding: 8px 12px;
-  min-height: 40px;
+  padding: 6px 10px;
+  min-height: 32px;
   border-radius: var(--radius-pill);
   background: var(--surface);
   box-shadow: var(--shadow);
 }
 .nav-btn.tint { color: var(--tint); }
 .nav-btn.icon-only {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   justify-content: center;
   color: var(--label);
 }
+/* Bare back button: no pill, no shadow, just a chevron */
+.nav-btn.bare {
+  background: transparent;
+  box-shadow: none;
+  padding: 4px 6px;
+  min-height: 32px;
+  color: var(--tint);
+}
+.nav-btn.bare:active { opacity: 0.55; }
 .nav-btn:active { transform: scale(0.96); opacity: 0.85; }
 
 .large-title {
@@ -174,11 +183,18 @@ input:focus, textarea:focus, [contenteditable]:focus {
   letter-spacing: -0.6px;
   line-height: 1.1;
 }
+/* Compact variant for the list-view header (title stays large on home) */
+.topbar-title-row .large-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  line-height: 1.15;
+}
 .topbar-title-row {
-  padding: 4px max(20px, var(--safe-left)) 12px max(20px, var(--safe-right));
+  padding: 2px max(20px, var(--safe-left)) 8px max(20px, var(--safe-right));
 }
 .topbar-title-row .large-title {
-  padding: 4px 0;
+  padding: 2px 0;
 }
 /* Title-row with a right-anchored button (Share). Title wraps freely; the
    button stays pinned to the top-right and never wraps below. */
@@ -194,7 +210,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
 }
 .title-row-flex .share-btn {
   flex-shrink: 0;
-  margin-top: 6px;
+  margin-top: 0;
 }
 .large-title.editable {
   outline: none;
@@ -266,29 +282,26 @@ input:focus, textarea:focus, [contenteditable]:focus {
 }
 .me-save:active { transform: scale(0.96); }
 
-/* Me-chip (top-right) — compact assignee-tinted pill for the current user */
+/* Me-chip (top-right) — matches the language toggle sizing (compact, no dot) */
 .nav-btn.me-chip {
-  padding: 6px 12px 6px 8px;
-  gap: 6px;
+  padding: 5px 10px;
+  min-height: 28px;
+  gap: 0;
+  font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.2px;
   color: var(--a-fg, var(--label));
   background: var(--a-bg, var(--surface));
-  max-width: 40vw;
-  min-width: 0;
+  box-shadow: 0 1px 2px rgba(15,12,41,0.08);
+  max-width: 30vw;
+  min-width: 30px;
 }
 .nav-btn.me-chip #me-chip-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.me-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.9;
-  flex-shrink: 0;
-}
+.me-dot { display: none; }
 
 /* Pill-shape filter chips (like the top of the design inspo) */
 .chip-row {
@@ -303,18 +316,22 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .chip {
   flex-shrink: 0;
   scroll-snap-align: start;
-  padding: 8px 16px;
-  font-size: 14px;
+  padding: 5px 12px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--label);
   background: var(--surface);
   border-radius: var(--radius-pill);
-  min-height: 36px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   box-shadow: var(--shadow);
   transition: transform 0.12s;
+}
+.chip .count {
+  padding: 0 6px;
+  font-size: 11px;
 }
 .chip:active { transform: scale(0.96); }
 .chip.active {
@@ -477,18 +494,20 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .row-main {
   flex: 1;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 8px;
+  display: grid;
+  /* Two columns: title | pills. Note (row-note) spans the full width below. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 8px;
+  row-gap: 2px;
   padding: 4px 0;
 }
 .row-name {
+  grid-column: 1;
   display: flex;
   align-items: baseline;
   gap: 6px;
   min-width: 0;
-  flex: 1 1 auto;
 }
 .row-title {
   font-size: 16px;
@@ -505,7 +524,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
   font-variant-numeric: tabular-nums;
 }
 .row-note {
-  width: 100%;
+  grid-column: 1 / -1;
   color: var(--label-tertiary);
   font-size: 13px;
   font-style: italic;
@@ -513,11 +532,14 @@ input:focus, textarea:focus, [contenteditable]:focus {
   padding-top: 2px;
 }
 .assignees {
+  grid-column: 2;
+  align-self: start;
   display: inline-flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 4px;
-  margin-left: auto;
+  /* Nudge down a hair so the pill baseline sits with the first line of title */
+  padding-top: 2px;
 }
 .assignee-tag {
   display: inline-flex;
@@ -950,14 +972,16 @@ input:focus, textarea:focus, [contenteditable]:focus {
 }
 
 /* ---------- Responsive ---------- */
-@media (min-width: 720px) {
+/* Only clamp width on truly wide viewports (tablet+ / desktop). A landscape
+   iPhone hits ~926px but should still fill the screen without a framed
+   column, so the breakpoint is 900px and up. On desktop the sides read as
+   background — no borders, same colour on both sides of the column. */
+@media (min-width: 900px) {
   #app {
     max-width: 640px;
     margin: 0 auto;
-    background: var(--surface);
+    background: var(--bg);
     min-height: 100vh;
-    border-left: 0.5px solid var(--separator);
-    border-right: 0.5px solid var(--separator);
   }
   body {
     background: var(--bg);

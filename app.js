@@ -828,6 +828,10 @@
         state.filter = btn.dataset.filter;
         $$('#filter-seg .chip').forEach(b => b.classList.toggle('active', b.dataset.filter === state.filter));
         renderItems();
+        // Issue #32: reset scroll so a shorter filtered list isn't
+        // stranded below the previous scroll offset.
+        const sc = $('.scroll');
+        if (sc) sc.scrollTop = 0;
       });
     });
 
