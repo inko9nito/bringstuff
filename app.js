@@ -41,6 +41,8 @@
       nav_lists: 'Lists',
       nav_share: 'Share',
       you_are: 'You are',
+      welcome_title: 'Welcome 👋',
+      welcome_hint: 'What should we call you?',
       your_name_ph: 'Your name',
       filter_all: 'All',
       filter_open: 'Not taken',
@@ -131,6 +133,8 @@
       nav_lists: 'Списки',
       nav_share: 'Поделиться',
       you_are: 'Ты',
+      welcome_title: 'Привет 👋',
+      welcome_hint: 'Как тебя записать?',
       your_name_ph: 'Твоё имя',
       filter_all: 'Все',
       filter_open: 'Свободно',
@@ -952,13 +956,14 @@
     $('#btn-back').addEventListener('click', () => navHome());
     $('#btn-share').addEventListener('click', () => copyShareLink(list));
 
-    // Issue #23: + button in the title row jumps to the add-item field.
+    // Issue #23/#58: + button in the title row jumps to the add-item field,
+    // which now lives at the top of the list.
     const addScrollBtn = $('#btn-add-scroll');
     if (addScrollBtn) {
       addScrollBtn.addEventListener('click', () => {
         const sc = $('.scroll');
         const ai = $('#add-input');
-        if (sc) sc.scrollTop = sc.scrollHeight;
+        if (sc) sc.scrollTo({ top: 0, behavior: 'smooth' });
         if (ai) { ai.focus(); }
       });
     }
@@ -986,9 +991,10 @@
     // line; Save reads every non-blank line and adds each as its own item.
     // The dedicated "Paste list…" button is gone since paste now works the
     // same as typing — one line per item.
+    // Issue #58: the add row now lives at the top of the list as a compact
+    // inline field with a checkmark button instead of a labeled "Add" button.
     const addInput = $('#add-input');
     const addBtn = $('#btn-add');
-    const addLabel = $('#btn-add-label');
 
     const autoGrow = () => {
       addInput.style.height = 'auto';
@@ -996,10 +1002,8 @@
     };
     const updateAddLabel = () => {
       const lines = addInput.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      addLabel.textContent = lines.length > 1
-        ? t('add_n_items', lines.length)
-        : t('add');
       addBtn.disabled = lines.length === 0;
+      addBtn.setAttribute('aria-label', lines.length > 1 ? t('add_n_items', lines.length) : t('add'));
     };
     const submitAdd = () => {
       const parsed = parsePaste(addInput.value);
