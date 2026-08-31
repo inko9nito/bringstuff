@@ -128,12 +128,11 @@ input:focus, textarea:focus, [contenteditable]:focus {
   background: var(--bar-bg);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 0.5px solid transparent;
+  /* Issue #84 follow-up: a permanent divider separates the filters from
+     the list below, matching the wireframe (previously this only
+     appeared once the page had been scrolled). */
+  border-bottom: 0.5px solid var(--separator);
   padding-top: var(--safe-top);
-  transition: border-color 0.2s;
-}
-.topbar.scrolled {
-  border-bottom-color: var(--separator);
 }
 .topbar-inner {
   min-height: 40px;
@@ -223,8 +222,15 @@ input:focus, textarea:focus, [contenteditable]:focus {
   gap: 10px;
   margin: 0 max(20px, var(--safe-left)) 12px max(20px, var(--safe-right));
   padding: 10px 14px;
-  background: var(--surface);
+  /* Muted until focused, so it doesn't read as another white input box
+     (like "Add items") at a glance — it turns white only on tap. */
+  background: var(--fill-tertiary);
   border-radius: var(--radius-pill);
+  box-shadow: none;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.search-row:focus-within {
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 .search-row-icon { flex-shrink: 0; color: var(--label-tertiary); }
@@ -245,8 +251,9 @@ input:focus, textarea:focus, [contenteditable]:focus {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--fill-tertiary);
+  background: var(--surface);
   color: var(--label-secondary);
+  box-shadow: var(--shadow);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -455,6 +462,11 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .card.spaced { padding: 8px; }
 .card.spaced > * + * { margin-top: 6px; }
 
+/* Issue #84 follow-up: less rounded than the default card, matching the
+   add-item row so both containers read as one consistent shape. */
+.list-grouped {
+  border-radius: var(--radius-sm);
+}
 .list-grouped .row + .row {
   border-top: 0.5px solid var(--separator);
 }
@@ -707,6 +719,9 @@ input:focus, textarea:focus, [contenteditable]:focus {
   align-items: flex-end;
   gap: 8px;
   padding: 4px 4px 4px 16px;
+  /* Issue #84 follow-up: less rounded than the pill-shaped search bar so
+     the two aren't mistaken for one another; matches the item list's card. */
+  border-radius: var(--radius-sm);
 }
 .add-textarea {
   flex: 1;
