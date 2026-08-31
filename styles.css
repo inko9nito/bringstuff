@@ -207,46 +207,46 @@ input:focus, textarea:focus, [contenteditable]:focus {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
-  transition: flex-grow 0.2s ease, opacity 0.2s ease;
 }
 .title-row-flex .share-btn {
   flex-shrink: 0;
   margin-top: 0;
 }
-/* Issue #15: the search button grows into an input between the title and
-   the share button; the title shrinks away while it's active. */
-.search-input {
-  flex: 0 0 0;
-  width: 0;
-  min-width: 0;
-  opacity: 0;
-  overflow: hidden;
-  border: 0;
-  background: transparent;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--label);
-  padding: 2px 0;
-  transition: flex-grow 0.2s ease, opacity 0.2s ease;
-}
-.search-input::placeholder { color: var(--label-tertiary); font-weight: 500; }
-.search-input::-webkit-search-cancel-button { display: none; }
+/* Issue #15: the search button grows into a pill input between the title
+   and the share button. The title stays visible, just yielding room
+   instead of disappearing, matching the requested wireframe. */
 .title-row-flex.searching .large-title {
-  flex: 0 0 0;
-  width: 0;
-  opacity: 0;
+  flex: 0 1 auto;
+  max-width: 40%;
+  white-space: nowrap;
   overflow: hidden;
-  pointer-events: none;
+  text-overflow: ellipsis;
 }
+.search-input {
+  display: none;
+  min-width: 0;
+  border: 0;
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--label);
+  padding: 8px 16px;
+  margin-top: 1px;
+}
+.search-input::placeholder { color: var(--label-tertiary); font-weight: 400; }
+.search-input::-webkit-search-cancel-button { display: none; }
+.search-clear-btn { display: none; }
 .title-row-flex.searching .search-input {
+  display: block;
   flex: 1 1 auto;
-  width: auto;
-  opacity: 1;
 }
-#btn-search.active {
-  color: var(--tint);
-  background: var(--tint-soft);
+.title-row-flex.searching .search-clear-btn {
+  display: inline-flex;
+}
+.title-row-flex.searching #btn-search {
+  display: none;
 }
 .large-title.editable {
   outline: none;

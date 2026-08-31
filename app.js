@@ -984,19 +984,19 @@
     $('#btn-back').addEventListener('click', () => navHome());
     $('#btn-share').addEventListener('click', () => copyShareLink(list));
 
-    // Issue #15: search grows the button into an input between the list
+    // Issue #15: search grows the button into a pill input between the list
     // name and the share button, filtering items by name/note as you type.
+    // The title stays visible (just yields room) rather than disappearing.
     const titleRow = $('#title-row');
     const searchBtn = $('#btn-search');
     const searchInput = $('#search-input');
+    const searchClearBtn = $('#btn-search-clear');
     const openSearch = () => {
       titleRow.classList.add('searching');
-      searchBtn.classList.add('active');
       searchInput.focus();
     };
     const closeSearch = () => {
       titleRow.classList.remove('searching');
-      searchBtn.classList.remove('active');
       if (state.search) {
         state.search = '';
         searchInput.value = '';
@@ -1008,13 +1008,10 @@
     // of resetting it.
     if (state.search) {
       titleRow.classList.add('searching');
-      searchBtn.classList.add('active');
       searchInput.value = state.search;
     }
-    searchBtn.addEventListener('click', () => {
-      if (titleRow.classList.contains('searching')) closeSearch();
-      else openSearch();
-    });
+    searchBtn.addEventListener('click', openSearch);
+    searchClearBtn.addEventListener('click', closeSearch);
     searchInput.addEventListener('input', () => {
       state.search = searchInput.value;
       renderItems();
