@@ -712,7 +712,9 @@ input:focus, textarea:focus, [contenteditable]:focus {
 /* Issue #58: add row moved to the top of the list, made small and inline
    with a round checkmark button instead of a full-width "Add" pill. */
 .add-block {
-  padding: 4px max(20px, var(--safe-left)) 14px max(20px, var(--safe-right));
+  /* Issue #84 follow-up: more breathing room below the now-permanent
+     chip/list divider — it was sitting almost flush against it. */
+  padding: 16px max(20px, var(--safe-left)) 14px max(20px, var(--safe-right));
 }
 .add-row {
   display: flex;
