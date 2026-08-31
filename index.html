@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+  <title>BringStuff — Shared bring lists</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%92%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Home view -->
+  <template id="tpl-home">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <h1 class="large-title">BringStuff</h1>
+      </div>
+    </header>
+    <main class="scroll">
+      <section class="hero">
+        <p class="hero-sub">Shared "who's bringing what" lists. No signup. Just paste and share.</p>
+      </section>
+      <section class="section">
+        <div class="section-header">New list</div>
+        <div class="card">
+          <input class="row-input" id="new-name" type="text" placeholder="List name (e.g. Shashlik trip)" autocomplete="off" />
+          <button class="row-button primary" id="btn-create">Create list</button>
+        </div>
+      </section>
+      <section class="section" id="recent-section" hidden>
+        <div class="section-header">Recent</div>
+        <div class="card list-grouped" id="recent-list"></div>
+      </section>
+      <footer class="footnote">Built for GitHub Pages · Data lives in the URL you share.</footer>
+    </main>
+  </template>
+
+  <!-- List view -->
+  <template id="tpl-list">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <button class="nav-btn" id="btn-back" aria-label="Back">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          <span>Lists</span>
+        </button>
+        <button class="nav-btn right" id="btn-share">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          <span>Share</span>
+        </button>
+      </div>
+      <div class="topbar-title-row">
+        <h1 class="large-title editable" id="list-title" contenteditable="true" spellcheck="false"></h1>
+      </div>
+      <div class="me-row">
+        <label for="me-input" class="me-label">You are</label>
+        <input id="me-input" class="me-input" type="text" placeholder="Your name" autocomplete="off" />
+      </div>
+      <div class="segmented" id="filter-seg">
+        <button data-filter="all" class="seg active">All</button>
+        <button data-filter="open" class="seg">Open</button>
+        <button data-filter="mine" class="seg">Mine</button>
+        <button data-filter="taken" class="seg">Taken</button>
+      </div>
+    </header>
+
+    <main class="scroll">
+      <div class="card list-grouped" id="items"></div>
+      <div class="add-block">
+        <div class="card">
+          <div class="row single-line">
+            <input class="row-input" id="add-input" type="text" placeholder="Add an item…" autocomplete="off" />
+            <input class="qty-input" id="add-qty" type="number" min="1" placeholder="Qty" inputmode="numeric" />
+            <button class="row-icon-btn primary" id="btn-add" aria-label="Add">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <button class="row-button" id="btn-paste">Paste list…</button>
+        </div>
+      </div>
+
+      <div class="footnote" id="stat-line"></div>
+    </main>
+
+    <!-- Selection toolbar (appears when items are checked) -->
+    <div class="selection-bar" id="sel-bar" hidden>
+      <button class="pill" id="sel-clear">Clear</button>
+      <div class="sel-count" id="sel-count">0 selected</div>
+      <button class="pill primary" id="sel-assign">Assign to me</button>
+    </div>
+  </template>
+
+  <!-- Paste sheet -->
+  <template id="tpl-paste-sheet">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <button class="sheet-btn" data-close>Cancel</button>
+        <div class="sheet-title">Paste list</div>
+        <button class="sheet-btn primary" data-confirm>Add</button>
+      </div>
+      <div class="sheet-body">
+        <p class="sheet-hint">One item per line. Lines with <span class="chip">✅ Name</span> get assigned automatically.</p>
+        <textarea class="sheet-textarea" id="paste-text" placeholder="Charcoal ✅ Bella&#10;Lighter fluid&#10;Buns for burgers x8"></textarea>
+        <label class="switch-row">
+          <span>Replace existing items</span>
+          <input type="checkbox" id="paste-replace" />
+        </label>
+      </div>
+    </div>
+  </template>
+
+  <!-- Share sheet -->
+  <template id="tpl-share-sheet">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <button class="sheet-btn" data-close>Done</button>
+        <div class="sheet-title">Share list</div>
+        <span class="sheet-btn placeholder"></span>
+      </div>
+      <div class="sheet-body">
+        <p class="sheet-hint">The whole list travels inside the link. Send it to friends — when they change something, they'll get a new link they can share back.</p>
+        <div class="share-url-box"><span id="share-url"></span></div>
+        <div class="share-actions">
+          <button class="row-button primary" id="btn-copy">Copy link</button>
+          <button class="row-button" id="btn-native-share" hidden>Share…</button>
+        </div>
+        <p class="sheet-hint muted" id="url-length"></p>
+      </div>
+    </div>
+  </template>
+
+  <!-- Item edit sheet -->
+  <template id="tpl-item-sheet">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <button class="sheet-btn" data-close>Cancel</button>
+        <div class="sheet-title">Edit item</div>
+        <button class="sheet-btn primary" data-confirm>Save</button>
+      </div>
+      <div class="sheet-body">
+        <label class="field-label">Name</label>
+        <input class="row-input solo" id="edit-name" type="text" />
+        <label class="field-label">Quantity (optional)</label>
+        <input class="row-input solo" id="edit-qty" type="number" min="1" inputmode="numeric" placeholder="e.g. 2" />
+        <label class="field-label">Note (optional)</label>
+        <input class="row-input solo" id="edit-note" type="text" placeholder="e.g. red wine" />
+        <label class="field-label">Bringing (comma-separated)</label>
+        <input class="row-input solo" id="edit-assignees" type="text" placeholder="Names" />
+        <button class="row-button destructive" id="btn-delete">Delete item</button>
+      </div>
+    </div>
+  </template>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
