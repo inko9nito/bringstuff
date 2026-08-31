@@ -102,6 +102,9 @@
       <div class="sel-count" id="sel-count"></div>
       <button class="pill" id="sel-clear" data-t="sel_clear"></button>
       <button class="pill primary" id="sel-assign"></button>
+      <button class="pill overflow" id="sel-overflow" aria-label="More">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+      </button>
     </div>
   </template>
 
@@ -210,6 +213,52 @@
         <label class="field-label" data-t="field_your_name"></label>
         <input class="row-input solo" id="name-input" type="text" autocapitalize="words" data-t-placeholder="your_name_ph" />
       </main>
+    </div>
+  </template>
+
+  <!-- Bulk actions sheet (selection overflow) -->
+  <template id="tpl-bulk-actions-sheet">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet confirm-sheet">
+      <div class="sheet-body">
+        <p class="confirm-title"></p>
+      </div>
+      <div class="sort-options" id="bulk-people"></div>
+      <div class="confirm-actions">
+        <button class="row-button destructive filled" id="bulk-delete"></button>
+        <button class="row-button" data-close data-t="cancel"></button>
+      </div>
+    </div>
+  </template>
+
+  <!-- Bulk assign to "someone else" sheet -->
+  <template id="tpl-bulk-other-sheet">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <button class="sheet-btn" data-close data-t="cancel"></button>
+        <div class="sheet-title" data-t="other_person_title"></div>
+        <button class="sheet-btn primary" data-confirm data-t="save"></button>
+      </div>
+      <div class="sheet-body">
+        <input class="row-input solo" id="bulk-other-input" type="text" autocomplete="off" autocapitalize="words" data-t-placeholder="other_person_ph" />
+      </div>
+    </div>
+  </template>
+
+  <!-- Bulk delete confirmation -->
+  <template id="tpl-confirm-bulk-delete-sheet">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet confirm-sheet">
+      <div class="sheet-body">
+        <p class="confirm-title"></p>
+        <p class="sheet-hint confirm-hint" data-t="confirm_delete_hint"></p>
+      </div>
+      <div class="confirm-actions">
+        <button class="row-button destructive filled" data-confirm></button>
+        <button class="row-button" data-close data-t="cancel"></button>
+      </div>
     </div>
   </template>
 
