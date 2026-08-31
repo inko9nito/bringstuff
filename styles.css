@@ -677,6 +677,29 @@ input:focus, textarea:focus, [contenteditable]:focus {
   margin: -6px;
 }
 
+/* Issue #82 / #59: shared "assign to" pill picker (bulk sheet + single item). */
+.assign-pill-label {
+  margin: 4px 18px 8px;
+  color: var(--label-tertiary);
+  font-size: 13px;
+}
+.assign-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.assign-pill-row--sheet {
+  padding: 0 max(16px, var(--safe-left)) 12px max(16px, var(--safe-right));
+}
+.assign-pill-row .assignee-tag.pill-pick {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.assign-pill-row .assignee-tag.pill-pick.pill-other {
+  background: var(--fill-tertiary);
+  color: var(--label-secondary);
+}
+
 .qty-input {
   width: 62px;
   padding: 10px 8px;
