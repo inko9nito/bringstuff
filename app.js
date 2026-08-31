@@ -53,8 +53,15 @@
       stats: (done, total) => `${done} of ${total} taken`,
       sel_clear: 'Clear',
       sel_count: (n) => `${n} selected`,
-      assign_to: (name) => name ? `Assign to ${name}` : 'Assign to me',
+      assign_to: () => 'Assign to me',
       cancel: 'Cancel',
+      confirm_delete_title: 'Delete this item?',
+      confirm_delete_hint: 'This can\'t be undone.',
+      sort_by: 'Sort by',
+      sort_date_asc: 'Date added (oldest first)',
+      sort_date_desc: 'Date added (newest first)',
+      sort_alpha_asc: 'Name (A → Z)',
+      sort_alpha_desc: 'Name (Z → A)',
       add: 'Add',
       done: 'Done',
       save: 'Save',
@@ -131,9 +138,16 @@
       paste_list: 'Вставить список…',
       stats: (done, total) => `${done} из ${total} разобрано`,
       sel_clear: 'Отмена',
-      sel_count: (n) => `Выбрано: ${n}`,
-      assign_to: (name) => name ? `Записать на ${name}` : 'Записать на меня',
+      sel_count: (n) => `${n} выбрано`,
+      assign_to: () => 'На меня',
       cancel: 'Отмена',
+      confirm_delete_title: 'Удалить пункт?',
+      confirm_delete_hint: 'Это нельзя отменить.',
+      sort_by: 'Сортировка',
+      sort_date_asc: 'По дате (сначала старые)',
+      sort_date_desc: 'По дате (сначала новые)',
+      sort_alpha_asc: 'По названию (А → Я)',
+      sort_alpha_desc: 'По названию (Я → А)',
       add: 'Добавить',
       done: 'Готово',
       save: 'Сохранить',
@@ -614,11 +628,22 @@
   }
 
   // ---------- App state ----------
+  const SORT_KEY = 'bringstuff:sort:v1';
+  function loadSort() {
+    try {
+      const s = localStorage.getItem(SORT_KEY);
+      if (s === 'date_asc' || s === 'date_desc' || s === 'alpha_asc' || s === 'alpha_desc') return s;
+    } catch {}
+    return 'date_asc';
+  }
+  function saveSort(s) { try { localStorage.setItem(SORT_KEY, s); } catch {} }
+
   const state = {
     lang: 'en',
     list: null,
     me: '',
     filter: 'all',
+    sort: 'date_asc',
     selected: new Set(),
     sheet: null,
     panel: null,
@@ -822,11 +847,26 @@
     $('#btn-back').addEventListener('click', () => navHome());
     $('#btn-share').addEventListener('click', () => openShareSheet());
 
-    $$('#filter-seg .chip').forEach(btn => {
+    // Issue #23: + button in the title row jumps to the add-item field.
+    const addScrollBtn = $('#btn-add-scroll');
+    if (addScrollBtn) {
+      addScrollBtn.addEventListener('click', () => {
+        const sc = $('.scroll');
+        const ai = $('#add-input');
+        if (sc) sc.scrollTop = sc.scrollHeight;
+        if (ai) { ai.focus(); }
+      });
+    }
+
+    // Issue #12: sort chip opens a bottom-sheet with sort options.
+    const sortBtn = $('#btn-sort');
+    if (sortBtn) sortBtn.addEventListener('click', () => openSortSheet());
+
+    $$('#filter-seg .chip[data-filter]').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.filter === state.filter);
       btn.addEventListener('click', () => {
         state.filter = btn.dataset.filter;
-        $$('#filter-seg .chip').forEach(b => b.classList.toggle('active', b.dataset.filter === state.filter));
+        $$('#filter-seg .chip[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter === state.filter));
         renderItems();
         // Issue #32: reset scroll so a shorter filtered list isn't
         // stranded below the previous scroll offset.
@@ -857,7 +897,7 @@
     const submitAdd = () => {
       const parsed = parsePaste(addInput.value);
       if (!parsed.length) return;
-      list.items = parsed.concat(list.items);
+      list.items = list.items.concat(parsed);
       addInput.value = '';
       autoGrow();
       updateAddLabel();
@@ -919,13 +959,22 @@
     }
   }
 
+  function sortItems(items) {
+    const s = state.sort;
+    if (s === 'date_asc') return items;              // stored order = insertion order
+    if (s === 'date_desc') return items.slice().reverse();
+    const cmp = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), state.lang === 'ru' ? 'ru' : undefined, { sensitivity: 'base', numeric: true });
+    const sorted = items.slice().sort(cmp);
+    return s === 'alpha_desc' ? sorted.reverse() : sorted;
+  }
+
   function renderItems() {
     const list = state.list;
     const container = $('#items');
     if (!container) return;
     container.innerHTML = '';
 
-    const items = list.items.filter(itemMatchesFilter);
+    const items = sortItems(list.items.filter(itemMatchesFilter));
     const me = (state.me || '').trim().toLowerCase();
 
     // Counts per filter for chips
@@ -1016,9 +1065,8 @@
     const n = state.selected.size;
     if (n === 0) { bar.hidden = true; return; }
     bar.hidden = false;
-    const me = (state.me || '').trim();
     $('#sel-count').textContent = t('sel_count', n);
-    $('#sel-assign').textContent = t('assign_to', me);
+    $('#sel-assign').textContent = t('assign_to');
   }
 
   function escapeHtml(s) {
@@ -1064,7 +1112,7 @@
         if (!parsed.length) { showToast(t('toast_no_items')); return; }
         const replace = sheet.querySelector('#paste-replace').checked;
         if (replace) state.list.items = parsed;
-        else state.list.items = parsed.concat(state.list.items);
+        else state.list.items = state.list.items.concat(parsed);
         close();
         commit();
         showToast(t('toast_added', parsed.length));
@@ -1082,7 +1130,7 @@
       sheet.querySelector('[data-confirm]').addEventListener('click', () => {
         const parsed = parsePaste(ta.value);
         if (!parsed.length) { showToast(t('toast_no_items')); return; }
-        state.list.items = parsed.concat(state.list.items);
+        state.list.items = state.list.items.concat(parsed);
         // clear add-input
         const ai = document.getElementById('add-input');
         if (ai) ai.value = '';
@@ -1262,7 +1310,6 @@
     if (!it) return;
     state.editingItemId = id;
     openPanel('tpl-item-view', ({ panel, close }) => {
-      panel.querySelector('.back-label').textContent = state.list.name || t('nav_lists');
       const nameI = panel.querySelector('#edit-name');
       const qtyI = panel.querySelector('#edit-qty');
       const noteI = panel.querySelector('#edit-note');
@@ -1327,11 +1374,34 @@
       });
 
       panel.querySelector('#btn-delete').addEventListener('click', () => {
-        state.list.items = state.list.items.filter(x => x.id !== id);
-        state.selected.delete(id);
-        close();
-        commit();
-        showToast(t('toast_deleted'));
+        openConfirmDeleteSheet(() => {
+          state.list.items = state.list.items.filter(x => x.id !== id);
+          state.selected.delete(id);
+          close();
+          commit();
+          showToast(t('toast_deleted'));
+        });
+      });
+    });
+  }
+
+  function openConfirmDeleteSheet(onConfirm) {
+    openSheet('tpl-confirm-delete-sheet', ({ sheet, close }) => {
+      sheet.querySelector('[data-confirm]').addEventListener('click', () => { close(); onConfirm(); });
+    });
+  }
+
+  function openSortSheet() {
+    openSheet('tpl-sort-sheet', ({ sheet, close }) => {
+      const opts = sheet.querySelectorAll('.sort-option');
+      opts.forEach(btn => {
+        if (btn.dataset.sort === state.sort) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+          state.sort = btn.dataset.sort;
+          saveSort(state.sort);
+          close();
+          renderItems();
+        });
       });
     });
   }
@@ -1353,6 +1423,7 @@
   // ---------- Boot ----------
   state.lang = detectLang();
   state.me = getMe();
+  state.sort = loadSort();
   document.documentElement.lang = state.lang;
   window.addEventListener('hashchange', render);
   render();

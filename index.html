@@ -63,6 +63,9 @@
       </div>
       <div class="topbar-title-row title-row-flex">
         <h1 class="large-title editable" id="list-title" contenteditable="true" spellcheck="false"></h1>
+        <button class="nav-btn share-btn icon-only" id="btn-add-scroll" aria-label="Add item">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
         <button class="nav-btn share-btn icon-only" id="btn-share" aria-label="Share">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
         </button>
@@ -73,6 +76,9 @@
         <button class="me-save" id="me-save" data-t="save"></button>
       </div>
       <div class="chip-row" id="filter-seg">
+        <button class="chip sort-chip" id="btn-sort" aria-label="Sort">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13"/><path d="M3 12h9"/><path d="M3 18h5"/><path d="M17 4v16"/><path d="M14 17l3 3 3-3"/></svg>
+        </button>
         <button data-filter="all" class="chip active"><span data-t="filter_all"></span><span class="count" id="cnt-all"></span></button>
         <button data-filter="mine" class="chip"><span data-t="filter_mine"></span><span class="count" id="cnt-mine"></span></button>
         <button data-filter="taken" class="chip"><span data-t="filter_taken"></span><span class="count" id="cnt-taken"></span></button>
@@ -93,8 +99,8 @@
     </main>
 
     <div class="selection-bar" id="sel-bar" hidden>
-      <button class="pill" id="sel-clear" data-t="sel_clear"></button>
       <div class="sel-count" id="sel-count"></div>
+      <button class="pill" id="sel-clear" data-t="sel_clear"></button>
       <button class="pill primary" id="sel-assign"></button>
     </div>
   </template>
@@ -144,18 +150,12 @@
 
   <!-- Item detail (iOS push-nav style) -->
   <template id="tpl-item-view">
-    <div class="push-panel" role="dialog" aria-modal="true">
+    <div class="push-panel item-detail-panel" role="dialog" aria-modal="true">
       <header class="topbar push-topbar">
         <div class="topbar-inner">
-          <button class="nav-btn tint" data-close>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-            <span class="back-label"></span>
-          </button>
+          <button class="nav-btn tint cancel-btn" data-close data-t="cancel"></button>
           <div class="spacer"></div>
-          <button class="nav-btn tint save-btn" data-confirm><b data-t="save"></b></button>
-        </div>
-        <div class="topbar-title-row">
-          <h1 class="large-title" data-t="edit_item"></h1>
+          <button class="save-btn-primary" data-confirm data-t="save"></button>
         </div>
       </header>
       <main class="scroll push-body">
@@ -167,8 +167,25 @@
         <input class="row-input solo" id="edit-note" type="text" data-t-placeholder="field_note_ph" />
         <label class="field-label" data-t="field_bringing"></label>
         <div class="assignee-editor" id="assignee-editor"></div>
-        <button class="row-button destructive" id="btn-delete" data-t="delete_item"></button>
       </main>
+      <div class="delete-anchor">
+        <button class="row-button destructive" id="btn-delete" data-t="delete_item"></button>
+      </div>
+    </div>
+  </template>
+
+  <!-- Delete-confirm action sheet -->
+  <template id="tpl-confirm-delete-sheet">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet confirm-sheet">
+      <div class="sheet-body">
+        <p class="confirm-title" data-t="confirm_delete_title"></p>
+        <p class="sheet-hint confirm-hint" data-t="confirm_delete_hint"></p>
+      </div>
+      <div class="confirm-actions">
+        <button class="row-button destructive filled" data-confirm data-t="delete_item"></button>
+        <button class="row-button" data-close data-t="cancel"></button>
+      </div>
     </div>
   </template>
 
@@ -193,6 +210,25 @@
         <label class="field-label" data-t="field_your_name"></label>
         <input class="row-input solo" id="name-input" type="text" autocapitalize="words" data-t-placeholder="your_name_ph" />
       </main>
+    </div>
+  </template>
+
+  <!-- Sort options sheet -->
+  <template id="tpl-sort-sheet">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet confirm-sheet">
+      <div class="sheet-body">
+        <p class="confirm-title" data-t="sort_by"></p>
+      </div>
+      <div class="sort-options" id="sort-options">
+        <button class="sort-option" data-sort="date_asc"><span data-t="sort_date_asc"></span></button>
+        <button class="sort-option" data-sort="date_desc"><span data-t="sort_date_desc"></span></button>
+        <button class="sort-option" data-sort="alpha_asc"><span data-t="sort_alpha_asc"></span></button>
+        <button class="sort-option" data-sort="alpha_desc"><span data-t="sort_alpha_desc"></span></button>
+      </div>
+      <div class="confirm-actions">
+        <button class="row-button" data-close data-t="cancel"></button>
+      </div>
     </div>
   </template>
 

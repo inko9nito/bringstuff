@@ -450,16 +450,18 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .row-button:active { transform: scale(0.99); }
 
 /* ---------- Item rows ---------- */
+/* Issue #24: tighter padding + slightly smaller title to fit more items
+   on screen without losing the roomy, friendly feel. */
 .row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  min-height: 56px;
+  gap: 10px;
+  padding: 6px 14px;
+  min-height: 46px;
   position: relative;
 }
 .row.single-line {
-  padding: 8px 8px 8px 18px;
+  padding: 6px 8px 6px 14px;
   gap: 8px;
 }
 .row.done .row-title {
@@ -500,7 +502,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
   align-items: start;
   column-gap: 8px;
   row-gap: 2px;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 .row-name {
   grid-column: 1;
@@ -510,7 +512,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
   min-width: 0;
 }
 .row-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--label);
   word-wrap: break-word;
@@ -794,12 +796,11 @@ input:focus, textarea:focus, [contenteditable]:focus {
 
 .field-label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--label-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0;
   padding: 14px 8px 6px 8px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .share-url-box {
@@ -918,10 +919,102 @@ input:focus, textarea:focus, [contenteditable]:focus {
   white-space: nowrap;
   max-width: 40vw;
 }
-.push-topbar .save-btn b { font-weight: 700; }
+.push-topbar .cancel-btn {
+  font-size: 17px;
+  font-weight: 500;
+}
+/* Issue #27: Save is a tinted pill, matching the "+ Add person" look. */
+.push-topbar .save-btn-primary {
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  background: var(--tint-soft);
+  color: var(--tint);
+  font-size: 15px;
+  font-weight: 700;
+  min-height: 36px;
+  margin-right: 6px;
+}
+.push-topbar .save-btn-primary:active { opacity: 0.85; transform: scale(0.97); }
 .push-body {
   padding: 12px max(20px, var(--safe-left)) calc(28px + var(--safe-bottom)) max(20px, var(--safe-right));
 }
+/* Issue #27: item detail is a column so the delete button can sit at the
+   very bottom, well away from the assignee editor's add button. */
+.item-detail-panel {
+  display: flex;
+  flex-direction: column;
+}
+.item-detail-panel .push-body {
+  flex: 1;
+  padding-bottom: 12px;
+}
+.delete-anchor {
+  border-top: 0.5px solid var(--separator);
+  padding: 12px max(20px, var(--safe-left)) calc(16px + var(--safe-bottom)) max(20px, var(--safe-right));
+  background: var(--bg);
+}
+.delete-anchor .row-button.destructive {
+  margin-top: 0;
+}
+
+/* Confirm & sort action sheets */
+.sheet.confirm-sheet { padding-bottom: calc(12px + var(--safe-bottom)); }
+.confirm-sheet .sheet-body { padding: 22px 22px 8px 22px; text-align: center; }
+.confirm-title {
+  margin: 0 0 6px 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--label);
+}
+.confirm-hint { text-align: center; margin: 0 4px 0 4px; }
+.confirm-actions {
+  display: grid;
+  gap: 8px;
+  padding: 12px max(16px, var(--safe-left)) 0 max(16px, var(--safe-right));
+}
+.confirm-actions .row-button {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin: 0;
+}
+.confirm-actions .row-button.destructive.filled {
+  background: var(--danger);
+  color: white;
+  box-shadow: 0 4px 12px rgba(229, 72, 77, 0.25);
+}
+
+/* Sort option list inside the sort sheet */
+.sort-options {
+  display: grid;
+  gap: 6px;
+  padding: 0 max(16px, var(--safe-left)) 0 max(16px, var(--safe-right));
+}
+.sort-option {
+  text-align: left;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 16px;
+  color: var(--label);
+  font-weight: 500;
+}
+.sort-option.active {
+  background: var(--tint-soft);
+  color: var(--tint);
+  font-weight: 700;
+}
+.sort-option:active { transform: scale(0.99); }
+
+/* Issue #12: the sort chip in the filter row is icon-only, same size as chips */
+.chip.sort-chip {
+  padding: 5px 10px;
+  min-width: 30px;
+  justify-content: center;
+  color: var(--label-secondary);
+}
+.chip.sort-chip svg { display: block; }
 @media (min-width: 720px) {
   .push-panel {
     max-width: 640px;
