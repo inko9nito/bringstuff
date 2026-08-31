@@ -207,10 +207,46 @@ input:focus, textarea:focus, [contenteditable]:focus {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+  transition: flex-grow 0.2s ease, opacity 0.2s ease;
 }
 .title-row-flex .share-btn {
   flex-shrink: 0;
   margin-top: 0;
+}
+/* Issue #15: the search button grows into an input between the title and
+   the share button; the title shrinks away while it's active. */
+.search-input {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--label);
+  padding: 2px 0;
+  transition: flex-grow 0.2s ease, opacity 0.2s ease;
+}
+.search-input::placeholder { color: var(--label-tertiary); font-weight: 500; }
+.search-input::-webkit-search-cancel-button { display: none; }
+.title-row-flex.searching .large-title {
+  flex: 0 0 0;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.title-row-flex.searching .search-input {
+  flex: 1 1 auto;
+  width: auto;
+  opacity: 1;
+}
+#btn-search.active {
+  color: var(--tint);
+  background: var(--tint-soft);
 }
 .large-title.editable {
   outline: none;
@@ -486,10 +522,14 @@ input:focus, textarea:focus, [contenteditable]:focus {
 
 .check {
   flex: 0 0 auto;
-  /* Align to the first line of the title (matters when a row grows
-     with per-assignee notes below), sized smaller for a lighter row. */
+  /* Issue #52: align to the first line of the title (matters when a row
+     grows with per-assignee notes below), sized smaller for a lighter row.
+     row-main is also pinned to flex-start (below) so its top edge is a
+     fixed reference point regardless of how tall the row grows; matching
+     margin-top here to row-main's own top padding keeps the circle's
+     center level with the title's first line in every case. */
   align-self: flex-start;
-  margin-top: 8px;
+  margin-top: 2px;
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -515,6 +555,11 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .row-main {
   flex: 1;
   min-width: 0;
+  /* Issue #52: without this, .row-main was vertically centered (the row's
+     own default) while .check was pinned to flex-start — the two only
+     lined up by coincidence at whatever height the row happened to be.
+     Pinning both to flex-start makes the offset above hold at any height. */
+  align-self: flex-start;
   display: grid;
   /* Two columns: title | pills. Note (row-note) spans the full width below. */
   grid-template-columns: minmax(0, 1fr) auto;
@@ -941,7 +986,14 @@ input:focus, textarea:focus, [contenteditable]:focus {
   margin-top: 2px;
 }
 .assignee-editor .ae-del:active { opacity: 0.7; }
+/* Issue #56: "Assign to me" + "Assign to…" side by side. */
+.assignee-editor .ae-quick-row {
+  display: flex;
+  gap: 8px;
+}
 .assignee-editor .ae-add {
+  flex: 1;
+  min-width: 0;
   padding: 10px 14px;
   border-radius: var(--radius-pill);
   color: var(--tint);
@@ -950,11 +1002,14 @@ input:focus, textarea:focus, [contenteditable]:focus {
   text-align: center;
   font-size: 14px;
 }
+.assignee-editor .ae-add:disabled {
+  opacity: 0.45;
+}
 
 /* Issue #44: view-only assignee rows with edit + delete actions. */
 .assignee-editor .ae-row-view {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   padding: 10px 12px 10px 14px;
   background: var(--surface);
@@ -1017,7 +1072,6 @@ input:focus, textarea:focus, [contenteditable]:focus {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 2px;
 }
 .assignee-editor .ae-view-btn:active { opacity: 0.7; transform: scale(0.94); }
 .assignee-editor .ae-view-del { color: var(--danger); }
