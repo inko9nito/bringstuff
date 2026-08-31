@@ -66,8 +66,8 @@
       sort_alpha_asc: 'Name (A → Z)',
       sort_alpha_desc: 'Name (Z → A)',
       ae_note_ph: 'Details (optional, e.g. red wine)',
-      assign_to_name: (name) => `Assign to ${name}`,
       assign_to_other: 'Assign to someone else…',
+      assign_to_prompt: 'Assign to…',
       other_person_title: 'Assign to someone',
       other_person_ph: 'Name',
       bulk_actions_title: (n) => `${n} selected`,
@@ -94,7 +94,6 @@
       ae_name_ph: 'Name',
       ae_qty_ph: 'Qty',
       ae_add: '+ Add person',
-      ae_assign_other: 'Assign to…',
       no_matches: 'No matches',
       no_matches_hint: 'Try a different filter.',
       empty_title: 'Nothing here yet',
@@ -165,9 +164,8 @@
       sort_alpha_asc: 'По названию (А → Я)',
       sort_alpha_desc: 'По названию (Я → А)',
       ae_note_ph: 'Что везёт (напр. красное вино)',
-      // Issue #45: RU sheet shows just the name — «На {name}» read as bad grammar.
-      assign_to_name: (name) => name,
       assign_to_other: 'На кого-то ещё…',
+      assign_to_prompt: 'Назначить…',
       other_person_title: 'Записать на',
       other_person_ph: 'Имя',
       bulk_actions_title: (n) => `${n} выбрано`,
@@ -209,7 +207,6 @@
       ae_name_ph: 'Имя',
       ae_qty_ph: 'Кол.',
       ae_add: '+ Добавить',
-      ae_assign_other: 'Назначить…',
       no_matches: 'Ничего не найдено',
       no_matches_hint: 'Попробуй другой фильтр.',
       empty_title: 'Пока пусто',
@@ -1440,6 +1437,35 @@
     return Array.from(seen.values());
   }
 
+  // Issue #82 / #59: shared "assign to" pill picker used by both the bulk
+  // assign sheet and the single-item assignee editor, so choosing an
+  // existing name works the same way in both places.
+  function renderAssigneePills(container, { list, excludeNames = [], includeMe = true, onPick, onOther }) {
+    container.innerHTML = '';
+    const excluded = new Set(excludeNames.map(n => (n || '').trim().toLowerCase()));
+    const me = (state.me || '').trim();
+    const seen = new Set();
+    const addPill = (name) => {
+      const key = name.toLowerCase();
+      if (seen.has(key) || excluded.has(key)) return;
+      seen.add(key);
+      const btn = document.createElement('button');
+      btn.className = 'assignee-tag pill-pick';
+      btn.style.cssText = assigneeStyle(name);
+      btn.textContent = name;
+      btn.addEventListener('click', () => onPick(name));
+      container.appendChild(btn);
+    };
+    if (includeMe && me) addPill(me);
+    for (const nm of uniqueAssigneeNames(list)) addPill(nm);
+
+    const otherBtn = document.createElement('button');
+    otherBtn.className = 'assignee-tag pill-pick pill-other';
+    otherBtn.textContent = t('assign_to_other');
+    otherBtn.addEventListener('click', onOther);
+    container.appendChild(otherBtn);
+  }
+
   function escapeHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -1815,8 +1841,8 @@
           });
           editor.appendChild(el);
         });
-        // Issue #56: quick "Assign to me" next to the existing "Assign to…"
-        // flow, so claiming an item doesn't require typing your own name.
+        // Issue #56: quick "Assign to me" so claiming an item doesn't
+        // require typing your own name.
         const quickRow = document.createElement('div');
         quickRow.className = 'ae-quick-row';
 
@@ -1833,23 +1859,29 @@
           draw();
         });
         quickRow.appendChild(meBtn);
-
-        const addBtn = document.createElement('button');
-        addBtn.className = 'ae-add';
-        addBtn.textContent = t('ae_assign_other');
-        addBtn.addEventListener('click', () => {
-          const fresh = makeAssignee();
-          openAssigneeView(fresh, (updated) => {
-            // Only add if the user actually gave a name.
-            if ((updated.name || '').trim()) {
-              rows.push(updated);
-              draw();
-            }
-          });
-        });
-        quickRow.appendChild(addBtn);
-
         editor.appendChild(quickRow);
+
+        // Issue #59: pick an existing name from a pill row instead of
+        // always having to type one in.
+        const pickerHost = document.createElement('div');
+        pickerHost.className = 'assign-pill-row';
+        renderAssigneePills(pickerHost, {
+          list: state.list,
+          excludeNames: rows.map(a => a.name),
+          includeMe: false,
+          onPick: (name) => { rows.push(makeAssignee(name)); draw(); },
+          onOther: () => {
+            const fresh = makeAssignee();
+            openAssigneeView(fresh, (updated) => {
+              // Only add if the user actually gave a name.
+              if ((updated.name || '').trim()) {
+                rows.push(updated);
+                draw();
+              }
+            });
+          },
+        });
+        editor.appendChild(pickerHost);
       };
       draw();
 
@@ -1896,31 +1928,12 @@
     if (!list || !n) return;
     openSheet('tpl-bulk-actions-sheet', ({ sheet, close }) => {
       sheet.querySelector('.confirm-title').textContent = t('bulk_actions_title', n);
-      const listEl = sheet.querySelector('#bulk-people');
-      listEl.innerHTML = '';
-      const me = (state.me || '').trim();
-      const seen = new Set();
-      const addBtn = (name) => {
-        const key = name.toLowerCase();
-        if (seen.has(key)) return;
-        seen.add(key);
-        const btn = document.createElement('button');
-        btn.className = 'sort-option';
-        btn.textContent = t('assign_to_name', name);
-        btn.addEventListener('click', () => { close(); bulkAssign(name); });
-        listEl.appendChild(btn);
-      };
-      if (me) addBtn(me);
-      for (const nm of uniqueAssigneeNames(list)) addBtn(nm);
-      // "Someone else" - opens a small input sheet.
-      const otherBtn = document.createElement('button');
-      otherBtn.className = 'sort-option';
-      otherBtn.textContent = t('assign_to_other');
-      otherBtn.addEventListener('click', () => {
-        close();
-        openBulkAssignOtherSheet();
+      sheet.querySelector('#bulk-people-label').textContent = t('assign_to_prompt');
+      renderAssigneePills(sheet.querySelector('#bulk-people'), {
+        list,
+        onPick: (name) => { close(); bulkAssign(name); },
+        onOther: () => { close(); openBulkAssignOtherSheet(); },
       });
-      listEl.appendChild(otherBtn);
       // Issue #69: move N items to the end of the list.
       const moveEndBtn = sheet.querySelector('#bulk-move-end');
       moveEndBtn.textContent = t('bulk_move_to_end', n);
