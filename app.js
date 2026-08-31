@@ -46,7 +46,8 @@
       filter_open: 'Not taken',
       filter_mine: 'Mine',
       filter_taken: 'Taken',
-      add_item_ph: 'Add an item…',
+      add_item_ph: 'Add items — one per line…',
+      add_n_items: (n) => `Add ${n} items`,
       qty_ph: 'Qty',
       paste_list: 'Paste list…',
       stats: (done, total) => `${done} of ${total} taken`,
@@ -123,7 +124,8 @@
       you_are_title: 'Твоё имя',
       you_are_hint: 'Имя сохраняется на этом устройстве и показывается рядом с тем, что ты везёшь.',
       field_your_name: 'Имя',
-      add_item_ph: 'Добавить…',
+      add_item_ph: 'Добавить пункты — по одному в строке…',
+      add_n_items: (n) => `Добавить ${n}`,
       qty_ph: 'Кол.',
       paste_list: 'Вставить список…',
       stats: (done, total) => `${done} из ${total} разобрано`,
@@ -332,14 +334,16 @@
   function saveHistory(arr) {
     try { localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(0, 12))); } catch {}
   }
-  function rememberList(list) {
+  function rememberList(list, enc) {
     if (!list || !list.id) return;
+    const hashStr = enc ? enc.scheme + '/' + enc.text : null;
+    const prior = loadHistory().find(x => x.id === list.id);
     const entry = {
       id: list.id,
       name: list.name,
       itemCount: list.items.length,
       updatedAt: list.updatedAt || now(),
-      hash: encodeState(list),
+      hash: hashStr || (prior && prior.hash) || null,
     };
     const h = loadHistory().filter(x => x.id !== list.id);
     h.unshift(entry);
@@ -376,25 +380,90 @@
       })),
     };
   }
-  function encodeState(list) { return b64uEncode(JSON.stringify(toCompact(list))); }
-  function decodeState(s) {
-    try { return fromCompact(JSON.parse(b64uDecode(s))); } catch { return null; }
+  // ---------- URL encoding ----------
+  // Two URL formats:
+  //   #/l/<b64>       – plain JSON (legacy, still readable so old links keep working)
+  //   #/z/<b64>       – deflate-raw compressed JSON (typically 40-60% shorter)
+  // We prefer #/z/ whenever CompressionStream is available.
+  const HAS_COMPRESSION = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+
+  function bytesToB64u(bytes) {
+    let bin = '';
+    // process in chunks to avoid call-stack limits on large arrays
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
+  function b64uToBytes(s) {
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    const bin = atob(s);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  async function deflate(bytes) {
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  async function inflate(bytes) {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  // Async encode — used by anything sharing/persisting a URL. Callers await.
+  async function encodeStateAsync(list) {
+    const json = JSON.stringify(toCompact(list));
+    if (!HAS_COMPRESSION) return { scheme: 'l', text: b64uEncode(json) };
+    try {
+      const compressed = await deflate(new TextEncoder().encode(json));
+      return { scheme: 'z', text: bytesToB64u(compressed) };
+    } catch {
+      return { scheme: 'l', text: b64uEncode(json) };
+    }
+  }
+  // Fallback sync encode — for initial URL after loading a compressed hash so we can
+  // update state without awaiting anything (URL text is updated separately, async).
+  function encodeStateSyncPlain(list) {
+    return { scheme: 'l', text: b64uEncode(JSON.stringify(toCompact(list))) };
+  }
+  async function decodeStateAsync(scheme, s) {
+    try {
+      if (scheme === 'z') {
+        if (!HAS_COMPRESSION) return null;
+        const bytes = b64uToBytes(s);
+        const raw = await inflate(bytes);
+        return fromCompact(JSON.parse(new TextDecoder().decode(raw)));
+      }
+      return fromCompact(JSON.parse(b64uDecode(s)));
+    } catch { return null; }
+  }
+  function makeHash(enc) { return '#/' + enc.scheme + '/' + enc.text; }
 
   // ---------- Router ----------
   function parseHash() {
     const h = location.hash || '#/';
     if (h === '#' || h === '#/' || h === '') return { name: 'home' };
     if (h.startsWith('#/list/')) return { name: 'list', id: h.slice(7) };
-    if (h.startsWith('#/l/')) return { name: 'list-encoded', data: h.slice(4) };
+    if (h.startsWith('#/l/')) return { name: 'list-encoded', scheme: 'l', data: h.slice(4) };
+    if (h.startsWith('#/z/')) return { name: 'list-encoded', scheme: 'z', data: h.slice(4) };
     return { name: 'home' };
   }
   function navHome() { location.hash = '#/'; }
-  function navList(list) { location.hash = '#/l/' + encodeState(list); }
+  function navList(list) {
+    encodeStateAsync(list).then(enc => {
+      state.currentHashKey = enc.scheme + ':' + enc.text;
+      location.hash = makeHash(enc);
+    });
+  }
   function updateHashInPlace(list) {
-    const newHash = '#/l/' + encodeState(list);
-    const newUrl = location.pathname + location.search + newHash;
-    history.replaceState(null, '', newUrl);
+    return encodeStateAsync(list).then(enc => {
+      const newUrl = location.pathname + location.search + makeHash(enc);
+      history.replaceState(null, '', newUrl);
+      return enc;
+    });
   }
 
   // ---------- App state ----------
@@ -407,14 +476,19 @@
     sheet: null,
     panel: null,
     editingItemId: null,
+    currentHashKey: null,
   };
 
   function commit() {
     if (!state.list) return;
     state.list.updatedAt = now();
-    updateHashInPlace(state.list);
-    rememberList(state.list);
+    // Render immediately from in-memory state so the UI is snappy;
+    // update the URL + history entry in the background.
     render();
+    updateHashInPlace(state.list).then(enc => {
+      state.currentHashKey = enc.scheme + ':' + enc.text;
+      rememberList(state.list, enc);
+    });
   }
 
   // ---------- Rendering ----------
@@ -424,21 +498,35 @@
     const route = parseHash();
     if (route.name === 'home') {
       renderHome();
-    } else if (route.name === 'list-encoded') {
-      const list = decodeState(route.data);
-      if (!list) { showToast(t('toast_invalid_link')); navHome(); return; }
-      if (!state.list || state.list.id !== list.id || encodeState(state.list) !== route.data) {
+      return;
+    }
+    if (route.name === 'list-encoded') {
+      const hashKey = route.scheme + ':' + route.data;
+      // If in-memory state already matches the URL, render without decoding.
+      if (state.list && state.currentHashKey === hashKey) { renderList(); return; }
+      decodeStateAsync(route.scheme, route.data).then(list => {
+        if (!list) { showToast(t('toast_invalid_link')); navHome(); return; }
         state.list = list;
         state.selected = new Set();
-        rememberList(list);
-      }
-      renderList();
-    } else if (route.name === 'list') {
+        state.currentHashKey = hashKey;
+        rememberList(list, { scheme: route.scheme, text: route.data });
+        renderList();
+      });
+      return;
+    }
+    if (route.name === 'list') {
       const hist = loadHistory().find(h => h.id === route.id);
       if (hist && hist.hash) {
-        history.replaceState(null, '', '#/l/' + hist.hash);
-        state.list = decodeState(hist.hash);
-        renderList();
+        // Legacy history may store just b64 (old format); newer stores "scheme/text".
+        const [scheme, text] = hist.hash.includes('/') ? hist.hash.split('/', 2) : ['l', hist.hash];
+        history.replaceState(null, '', '#/' + scheme + '/' + text);
+        decodeStateAsync(scheme, text).then(list => {
+          if (!list) { showToast(t('toast_list_not_found')); navHome(); return; }
+          state.list = list;
+          state.selected = new Set();
+          state.currentHashKey = scheme + ':' + text;
+          renderList();
+        });
       } else {
         showToast(t('toast_list_not_found'));
         navHome();
@@ -490,8 +578,10 @@
         const stamp = new Date(h.updatedAt).toLocaleDateString(state.lang === 'ru' ? 'ru-RU' : undefined, { month: 'short', day: 'numeric' });
         row.querySelector('.assignee-tag').textContent = `${t('recent_items', h.itemCount)} · ${stamp}`;
         row.addEventListener('click', () => {
-          if (h.hash) location.hash = '#/l/' + h.hash;
-          else location.hash = '#/list/' + h.id;
+          if (h.hash) {
+            const [scheme, text] = h.hash.includes('/') ? h.hash.split('/', 2) : ['l', h.hash];
+            location.hash = '#/' + scheme + '/' + text;
+          } else location.hash = '#/list/' + h.id;
         });
         recentEl.appendChild(row);
       }
@@ -561,36 +651,44 @@
       });
     });
 
+    // Issue #20: add block is now a multi-line textarea. Enter makes a new
+    // line; Save reads every non-blank line and adds each as its own item.
+    // The dedicated "Paste list…" button is gone since paste now works the
+    // same as typing — one line per item.
     const addInput = $('#add-input');
-    const addQty = $('#add-qty');
     const addBtn = $('#btn-add');
+    const addLabel = $('#btn-add-label');
+
+    const autoGrow = () => {
+      addInput.style.height = 'auto';
+      addInput.style.height = Math.min(addInput.scrollHeight, window.innerHeight * 0.4) + 'px';
+    };
+    const updateAddLabel = () => {
+      const lines = addInput.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      addLabel.textContent = lines.length > 1
+        ? t('add_n_items', lines.length)
+        : t('add');
+      addBtn.disabled = lines.length === 0;
+    };
     const submitAdd = () => {
-      const name = addInput.value.trim();
-      if (!name) return;
-      const it = emptyItem(name);
-      const q = parseInt(addQty.value, 10);
-      if (!Number.isNaN(q) && q > 0) it.qty = q;
-      list.items.unshift(it);
+      const parsed = parsePaste(addInput.value);
+      if (!parsed.length) return;
+      list.items = parsed.concat(list.items);
       addInput.value = '';
-      addQty.value = '';
+      autoGrow();
+      updateAddLabel();
       addInput.focus();
       commit();
+      if (parsed.length > 1) showToast(t('toast_added', parsed.length));
     };
     addBtn.addEventListener('click', submitAdd);
-    addInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitAdd(); });
-    addQty.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitAdd(); });
-
-    // Issue #7: detect multi-line paste into add-input
-    addInput.addEventListener('paste', (e) => {
-      const text = (e.clipboardData || window.clipboardData).getData('text');
-      if (!text || !/\r?\n/.test(text.trim())) return; // single line → normal paste
-      const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      if (lines.length < 2) return;
-      e.preventDefault();
-      openPasteDetectSheet(text);
+    addInput.addEventListener('input', () => { autoGrow(); updateAddLabel(); });
+    // Cmd/Ctrl+Enter also submits so keyboard users don't have to reach for Save.
+    addInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitAdd(); }
     });
-
-    $('#btn-paste').addEventListener('click', () => openPasteSheet());
+    autoGrow();
+    updateAddLabel();
 
     const scroll = $('.scroll');
     const topbar = $('.topbar');
@@ -863,7 +961,75 @@
     const panel = host.querySelector('.push-panel');
     const close = () => closePanel();
     host.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
+    if (panel) attachSwipeToDismiss(panel, close);
     if (setup) setup({ panel, close });
+  }
+
+  // Issue #16 — right-swipe dismisses a push panel (iOS nav-stack pop).
+  function attachSwipeToDismiss(panel, close) {
+    let startX = 0, startY = 0, startTime = 0, dx = 0, dy = 0;
+    let dragging = false, decided = false, cancelled = false;
+    const TH_DIST = 90;       // px: swipe further than this → close
+    const TH_VELOCITY = 0.6;  // px/ms
+    const EDGE_ZONE = 32;     // px from left edge is a guaranteed drag zone
+
+    const onTouchStart = (e) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      // If the touch begins in an interactive input, defer to that element.
+      const tag = (e.target.tagName || '').toLowerCase();
+      const inEditable = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
+      // Only interpret drags that begin near the left edge as swipe-to-close
+      // when starting inside editable regions; otherwise anywhere on the panel.
+      if (inEditable && t.clientX > EDGE_ZONE) { cancelled = true; return; }
+      startX = t.clientX; startY = t.clientY;
+      startTime = performance.now();
+      dx = 0; dy = 0; dragging = true; decided = false; cancelled = false;
+    };
+    const onTouchMove = (e) => {
+      if (!dragging || cancelled) return;
+      const t = e.touches[0];
+      dx = t.clientX - startX;
+      dy = t.clientY - startY;
+      if (!decided) {
+        // Wait until user commits to a direction; if the initial motion is
+        // mostly vertical (or leftward), treat this as a normal scroll.
+        if (Math.abs(dx) + Math.abs(dy) < 8) return;
+        if (dx < 4 || Math.abs(dy) > Math.abs(dx) * 1.3) { cancelled = true; return; }
+        decided = true;
+      }
+      if (dx < 0) dx = 0;
+      panel.style.transition = 'none';
+      panel.style.transform = `translateX(${dx}px)`;
+      panel.style.willChange = 'transform';
+      // Prevent the underlying page from scrolling while we own the gesture.
+      if (e.cancelable) e.preventDefault();
+    };
+    const onTouchEnd = () => {
+      if (!dragging) return;
+      dragging = false;
+      if (cancelled || !decided) {
+        panel.style.transform = '';
+        panel.style.transition = '';
+        return;
+      }
+      const dt = Math.max(1, performance.now() - startTime);
+      const v = dx / dt;
+      const shouldClose = dx > TH_DIST || v > TH_VELOCITY;
+      if (shouldClose) {
+        panel.style.transition = 'transform 0.22s cubic-bezier(0.4, 0, 0.9, 0.4)';
+        panel.style.transform = 'translateX(100%)';
+        setTimeout(() => close(), 220);
+      } else {
+        panel.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.02)';
+        panel.style.transform = 'translateX(0)';
+        setTimeout(() => { panel.style.transform = ''; panel.style.transition = ''; }, 240);
+      }
+    };
+    panel.addEventListener('touchstart', onTouchStart, { passive: true });
+    panel.addEventListener('touchmove', onTouchMove, { passive: false });
+    panel.addEventListener('touchend', onTouchEnd, { passive: true });
+    panel.addEventListener('touchcancel', onTouchEnd, { passive: true });
   }
   function closePanel(immediate = false) {
     if (!state.panel) return;
