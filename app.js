@@ -70,6 +70,8 @@
       other_person_title: 'Assign to someone',
       other_person_ph: 'Name',
       bulk_actions_title: (n) => `${n} selected`,
+      bulk_move_to_end: (n) => `Move ${n} item${n === 1 ? '' : 's'} to end`,
+      toast_moved_to_end: (n) => `Moved ${n} item${n === 1 ? '' : 's'} to the end`,
       bulk_delete: (n) => `Delete ${n} item${n === 1 ? '' : 's'}`,
       confirm_bulk_delete_title: (n) => `Delete ${n} item${n === 1 ? '' : 's'}?`,
       toast_bulk_deleted: (n) => `Deleted ${n} item${n === 1 ? '' : 's'}`,
@@ -167,6 +169,13 @@
       other_person_title: 'Записать на',
       other_person_ph: 'Имя',
       bulk_actions_title: (n) => `${n} выбрано`,
+      bulk_move_to_end: (n) => {
+        const m10 = n % 10, m100 = n % 100;
+        if (m10 === 1 && m100 !== 11) return `Переместить ${n} пункт в конец`;
+        if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return `Переместить ${n} пункта в конец`;
+        return `Переместить ${n} пунктов в конец`;
+      },
+      toast_moved_to_end: (n) => `Перемещено в конец: ${n}`,
       bulk_delete: (n) => {
         const m10 = n % 10, m100 = n % 100;
         if (m10 === 1 && m100 !== 11) return `Удалить ${n} пункт`;
@@ -790,6 +799,16 @@
         const list = fromCompact(payload);
         if (!list) return;
         cacheRemote(route.bucketId, payload);
+        // Issue #75: this fetch was already in flight when it started, so a
+        // local edit (e.g. adding items) can land while we're waiting on it.
+        // If that happened, state.list is now newer than what the server had
+        // when it answered — adopting the fetch's stale snapshot would
+        // silently wipe out the edit. Only apply it if it isn't older than
+        // what's already showing, and if we're still even looking at this
+        // same list (the user may have navigated away while this was in flight).
+        if (state.list && state.currentHashKey === hashKey && state.list.updatedAt > (list.updatedAt || 0)) {
+          return;
+        }
         // Only re-render if the remote is different from what we already show.
         const changed = !state.list || JSON.stringify(toCompact(state.list)) !== JSON.stringify(payload);
         state.list = list;
@@ -955,18 +974,6 @@
 
     $('#btn-back').addEventListener('click', () => navHome());
     $('#btn-share').addEventListener('click', () => copyShareLink(list));
-
-    // Issue #23/#58: + button in the title row jumps to the add-item field,
-    // which now lives at the top of the list.
-    const addScrollBtn = $('#btn-add-scroll');
-    if (addScrollBtn) {
-      addScrollBtn.addEventListener('click', () => {
-        const sc = $('.scroll');
-        const ai = $('#add-input');
-        if (sc) sc.scrollTo({ top: 0, behavior: 'smooth' });
-        if (ai) { ai.focus(); }
-      });
-    }
 
     // Issue #12: sort chip opens a bottom-sheet with sort options.
     const sortBtn = $('#btn-sort');
@@ -1261,6 +1268,24 @@
     state.selected.clear();
     commit();
     showToast(t('toast_bulk_deleted', n));
+  }
+
+  // Issue #69: bulk "move to end" — reorders the selected items to the end
+  // of the list, keeping their relative order, without touching anything
+  // else. The default sort is plain insertion order, so this is how you fix
+  // items that landed too early (e.g. imported before some later additions).
+  function bulkMoveToEnd() {
+    const list = state.list;
+    if (!list) return;
+    const ids = new Set(state.selected);
+    if (!ids.size) return;
+    const n = ids.size;
+    const moving = list.items.filter(x => ids.has(x.id));
+    const staying = list.items.filter(x => !ids.has(x.id));
+    list.items = staying.concat(moving);
+    state.selected.clear();
+    commit();
+    showToast(t('toast_moved_to_end', n));
   }
 
   function uniqueAssigneeNames(list) {
@@ -1735,6 +1760,13 @@
         openBulkAssignOtherSheet();
       });
       listEl.appendChild(otherBtn);
+      // Issue #69: move N items to the end of the list.
+      const moveEndBtn = sheet.querySelector('#bulk-move-end');
+      moveEndBtn.textContent = t('bulk_move_to_end', n);
+      moveEndBtn.addEventListener('click', () => {
+        close();
+        bulkMoveToEnd();
+      });
       // Delete N items.
       const delBtn = sheet.querySelector('#bulk-delete');
       delBtn.textContent = t('bulk_delete', n);
