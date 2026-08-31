@@ -336,7 +336,14 @@
   }
   function rememberList(list, enc) {
     if (!list || !list.id) return;
-    const hashStr = enc ? enc.scheme + '/' + enc.text : null;
+    // Prefer a slug-URL representation if we have a live bucket for this list.
+    let hashStr = null;
+    if (state.bucketId) {
+      hashStr = encodeURIComponent(state.slug || makeSlug(list.name, list.updatedAt)) + '~' + encodeURIComponent(state.bucketId);
+      // Kept distinguishable from legacy "scheme/text" hashes below by the '~'.
+    } else if (enc) {
+      hashStr = enc.scheme + '/' + enc.text;
+    }
     const prior = loadHistory().find(x => x.id === list.id);
     const entry = {
       id: list.id,
@@ -380,11 +387,73 @@
       })),
     };
   }
+  // ---------- Remote storage (kvdb.io) ----------
+  // Each list gets its own kvdb bucket the first time it's created; we PUT
+  // updates into the bucket on every commit and GET them back on load. The
+  // shareable URL becomes  #/{slug}~{bucketId}  — short, human-readable, and
+  // real live collaboration between anyone with the link.
+  //
+  // Fallback: if kvdb is unreachable (network offline / service down), we
+  // silently drop back to the old #/z/... self-contained compressed URL so
+  // the app keeps working, and stash a local copy in localStorage so a
+  // remote-backed list can still be read on the creating device.
+  const KVDB_BASE = 'https://kvdb.io';
+  const KVDB_KEY = 'v1';
+
+  async function kvdbCreate() {
+    const r = await fetch(KVDB_BASE + '/', { method: 'POST' });
+    if (!r.ok) throw new Error('kvdb create ' + r.status);
+    const text = (await r.text()).trim();
+    // Response body is the full bucket URL.
+    const id = text.replace(/^https?:\/\/[^/]+\//, '').replace(/\/$/, '');
+    if (!id) throw new Error('kvdb no id');
+    return id;
+  }
+  async function kvdbPut(bucketId, payload) {
+    const r = await fetch(`${KVDB_BASE}/${encodeURIComponent(bucketId)}/${KVDB_KEY}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!r.ok) throw new Error('kvdb put ' + r.status);
+  }
+  async function kvdbGet(bucketId) {
+    const r = await fetch(`${KVDB_BASE}/${encodeURIComponent(bucketId)}/${KVDB_KEY}`);
+    if (!r.ok) return null;
+    const txt = await r.text();
+    if (!txt) return null;
+    try { return JSON.parse(txt); } catch { return null; }
+  }
+
+  const REMOTE_CACHE_PREFIX = 'bringstuff:remote:v1:';
+  function cacheRemote(bucketId, payload) {
+    try { localStorage.setItem(REMOTE_CACHE_PREFIX + bucketId, JSON.stringify(payload)); } catch {}
+  }
+  function readRemoteCache(bucketId) {
+    try {
+      const raw = localStorage.getItem(REMOTE_CACHE_PREFIX + bucketId);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
+  function makeSlug(name, dateMs) {
+    const d = new Date(dateMs || Date.now());
+    const ym = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0');
+    // Allow Unicode letters + digits, collapse everything else to a single dash.
+    let clean = String(name || '')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40);
+    if (!clean) clean = 'list';
+    return `${clean}-${ym}`;
+  }
+
   // ---------- URL encoding ----------
-  // Two URL formats:
-  //   #/l/<b64>       – plain JSON (legacy, still readable so old links keep working)
-  //   #/z/<b64>       – deflate-raw compressed JSON (typically 40-60% shorter)
-  // We prefer #/z/ whenever CompressionStream is available.
+  // Three URL formats:
+  //   #/{slug}~{bucketId}  – remote list stored in kvdb (default going forward)
+  //   #/l/<b64>            – legacy plain JSON  (kept working for old links)
+  //   #/z/<b64>            – legacy deflate-compressed JSON  (kept working)
   const HAS_COMPRESSION = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
 
   function bytesToB64u(bytes) {
@@ -449,16 +518,68 @@
     if (h.startsWith('#/list/')) return { name: 'list', id: h.slice(7) };
     if (h.startsWith('#/l/')) return { name: 'list-encoded', scheme: 'l', data: h.slice(4) };
     if (h.startsWith('#/z/')) return { name: 'list-encoded', scheme: 'z', data: h.slice(4) };
+    // Otherwise, slug format: #/{slug}~{bucketId}
+    const tail = decodeURIComponent(h.slice(2));
+    if (tail && !tail.includes('/')) {
+      const tildeIdx = tail.lastIndexOf('~');
+      if (tildeIdx > 0 && tildeIdx < tail.length - 1) {
+        return { name: 'list-remote', slug: tail.slice(0, tildeIdx), bucketId: tail.slice(tildeIdx + 1) };
+      }
+    }
     return { name: 'home' };
   }
   function navHome() { location.hash = '#/'; }
+  function slugHash(slug, bucketId) {
+    return '#/' + encodeURIComponent(slug) + '~' + encodeURIComponent(bucketId);
+  }
   function navList(list) {
-    encodeStateAsync(list).then(enc => {
-      state.currentHashKey = enc.scheme + ':' + enc.text;
-      location.hash = makeHash(enc);
-    });
+    // Try remote-store path first; fall back to compressed URL on failure.
+    (async () => {
+      try {
+        const bucketId = await kvdbCreate();
+        state.bucketId = bucketId;
+        state.slug = makeSlug(list.name, list.updatedAt);
+        const payload = toCompact(list);
+        await kvdbPut(bucketId, payload);
+        cacheRemote(bucketId, payload);
+        state.currentHashKey = 'r:' + bucketId;
+        rememberList(list, null);
+        location.hash = slugHash(state.slug, bucketId);
+      } catch (err) {
+        // fallback to compressed URL
+        encodeStateAsync(list).then(enc => {
+          state.currentHashKey = enc.scheme + ':' + enc.text;
+          rememberList(list, enc);
+          location.hash = makeHash(enc);
+        });
+      }
+    })();
+  }
+  // Debounced background PUT so rapid edits coalesce.
+  let putTimer = null;
+  function scheduleRemotePut(bucketId, list) {
+    clearTimeout(putTimer);
+    putTimer = setTimeout(() => {
+      const payload = toCompact(list);
+      cacheRemote(bucketId, payload);
+      kvdbPut(bucketId, payload).catch(() => {/* ignore transient errors */});
+    }, 350);
   }
   function updateHashInPlace(list) {
+    // If we already have a bucket, PUT to it (debounced) and keep URL as-is.
+    if (state.bucketId) {
+      // If title changed, refresh the human-readable slug part of the URL.
+      const wantSlug = makeSlug(list.name, list.updatedAt);
+      if (wantSlug !== state.slug) {
+        state.slug = wantSlug;
+        const newHash = slugHash(state.slug, state.bucketId);
+        const newUrl = location.pathname + location.search + newHash;
+        history.replaceState(null, '', newUrl);
+      }
+      scheduleRemotePut(state.bucketId, list);
+      return Promise.resolve({ scheme: 'r', text: state.bucketId });
+    }
+    // Otherwise (legacy self-contained URL), update the hash payload as before.
     return encodeStateAsync(list).then(enc => {
       const newUrl = location.pathname + location.search + makeHash(enc);
       history.replaceState(null, '', newUrl);
@@ -477,6 +598,8 @@
     panel: null,
     editingItemId: null,
     currentHashKey: null,
+    bucketId: null,   // kvdb bucket for the current list (null = legacy URL-only)
+    slug: null,       // current human-readable slug in the URL
   };
 
   function commit() {
@@ -497,13 +620,45 @@
   function render() {
     const route = parseHash();
     if (route.name === 'home') {
+      state.bucketId = null; state.slug = null;
       renderHome();
+      return;
+    }
+    if (route.name === 'list-remote') {
+      const hashKey = 'r:' + route.bucketId;
+      if (state.list && state.currentHashKey === hashKey) { renderList(); return; }
+      state.bucketId = route.bucketId;
+      state.slug = route.slug;
+      // Try cache first for instant paint, then refresh from remote.
+      const cached = readRemoteCache(route.bucketId);
+      if (cached) {
+        state.list = fromCompact(cached);
+        state.selected = new Set();
+        state.currentHashKey = hashKey;
+        renderList();
+      }
+      kvdbGet(route.bucketId).then(payload => {
+        if (!payload) {
+          if (!state.list) { showToast(t('toast_list_not_found')); navHome(); }
+          return;
+        }
+        const list = fromCompact(payload);
+        if (!list) return;
+        cacheRemote(route.bucketId, payload);
+        // Only re-render if the remote is different from what we already show.
+        const changed = !state.list || JSON.stringify(toCompact(state.list)) !== JSON.stringify(payload);
+        state.list = list;
+        state.currentHashKey = hashKey;
+        rememberList(list, null);
+        if (changed) renderList();
+      });
       return;
     }
     if (route.name === 'list-encoded') {
       const hashKey = route.scheme + ':' + route.data;
       // If in-memory state already matches the URL, render without decoding.
       if (state.list && state.currentHashKey === hashKey) { renderList(); return; }
+      state.bucketId = null; state.slug = null;
       decodeStateAsync(route.scheme, route.data).then(list => {
         if (!list) { showToast(t('toast_invalid_link')); navHome(); return; }
         state.list = list;
@@ -517,16 +672,8 @@
     if (route.name === 'list') {
       const hist = loadHistory().find(h => h.id === route.id);
       if (hist && hist.hash) {
-        // Legacy history may store just b64 (old format); newer stores "scheme/text".
-        const [scheme, text] = hist.hash.includes('/') ? hist.hash.split('/', 2) : ['l', hist.hash];
-        history.replaceState(null, '', '#/' + scheme + '/' + text);
-        decodeStateAsync(scheme, text).then(list => {
-          if (!list) { showToast(t('toast_list_not_found')); navHome(); return; }
-          state.list = list;
-          state.selected = new Set();
-          state.currentHashKey = scheme + ':' + text;
-          renderList();
-        });
+        // Rewrite to the concrete URL and re-render through the normal flow.
+        location.hash = '#/' + hist.hash;
       } else {
         showToast(t('toast_list_not_found'));
         navHome();
@@ -579,8 +726,12 @@
         row.querySelector('.assignee-tag').textContent = `${t('recent_items', h.itemCount)} · ${stamp}`;
         row.addEventListener('click', () => {
           if (h.hash) {
-            const [scheme, text] = h.hash.includes('/') ? h.hash.split('/', 2) : ['l', h.hash];
-            location.hash = '#/' + scheme + '/' + text;
+            if (h.hash.includes('~')) {
+              location.hash = '#/' + h.hash;
+            } else {
+              const [scheme, text] = h.hash.includes('/') ? h.hash.split('/', 2) : ['l', h.hash];
+              location.hash = '#/' + scheme + '/' + text;
+            }
           } else location.hash = '#/list/' + h.id;
         });
         recentEl.appendChild(row);
