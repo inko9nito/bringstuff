@@ -523,12 +523,14 @@ input:focus, textarea:focus, [contenteditable]:focus {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 14px;
+  /* Issue: +2px vertical padding so short rows read as vertically
+     centered rather than sitting slightly high. */
+  padding: 8px 14px;
   min-height: 42px;
   position: relative;
 }
 .row.single-line {
-  padding: 6px 8px 6px 14px;
+  padding: 8px 8px 8px 14px;
   gap: 8px;
 }
 .row.done .row-title {
