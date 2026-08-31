@@ -49,7 +49,7 @@
       filter_mine: 'Mine',
       filter_taken: 'Taken',
       search_ph: 'Search',
-      add_item_ph: 'Add items — one per line…',
+      add_item_ph: 'Add items (one per line)',
       add_n_items: (n) => `Add ${n} items`,
       qty_ph: 'Qty',
       paste_list: 'Paste list…',
