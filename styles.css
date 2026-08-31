@@ -158,6 +158,13 @@ input:focus, textarea:focus, [contenteditable]:focus {
   box-shadow: var(--shadow);
 }
 .nav-btn.tint { color: var(--tint); }
+.nav-btn.icon-only {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  justify-content: center;
+  color: var(--label);
+}
 .nav-btn:active { transform: scale(0.96); opacity: 0.85; }
 
 .large-title {
@@ -336,11 +343,13 @@ input:focus, textarea:focus, [contenteditable]:focus {
   padding: 0 0 calc(120px + var(--safe-bottom)) 0;
 }
 /* Give every top-level card inside a scroll area a real horizontal gutter,
-   so lists don't touch the viewport edges (issue #13). */
+   matching the filter chip row's 20px padding so left edges line up. */
 .scroll > .card {
-  margin-left: max(16px, var(--safe-left));
-  margin-right: max(16px, var(--safe-right));
+  margin-left: max(20px, var(--safe-left));
+  margin-right: max(20px, var(--safe-right));
 }
+/* And bring the add-block gutter to the same 20px so its card lines up too. */
+.add-block { padding-left: max(20px, var(--safe-left)); padding-right: max(20px, var(--safe-right)); }
 
 /* ---------- Hero (home) ---------- */
 .hero {
