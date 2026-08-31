@@ -1236,7 +1236,6 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .row-input.half-width {
   width: 50vw;
   max-width: 100%;
-  text-align: center;
 }
 /* Issue #62: a taller textarea reads as a note rather than a name field —
    roughly double the previous single-line input's height. */
