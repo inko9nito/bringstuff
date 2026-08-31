@@ -756,7 +756,10 @@ input:focus, textarea:focus, [contenteditable]:focus {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 4px 4px 4px 16px;
+  /* Left padding is 1.5px less than .row's 14px to offset this box's own
+     border, so the plus icon and placeholder line up with the check
+     circle and item title below. */
+  padding: 4px 4px 4px 12.5px;
   /* Issue #84 follow-up: less rounded than the pill-shaped search bar so
      the two aren't mistaken for one another; matches the item list's card. */
   border-radius: var(--radius-sm);
