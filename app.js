@@ -408,12 +408,20 @@
       hashStr = enc.scheme + '/' + enc.text;
     }
     const prior = loadHistory().find(x => x.id === list.id);
+    // Never let a legacy self-contained hash (no live bucket behind it)
+    // clobber a bucket-backed hash we already have for this same list —
+    // reopening a stale #/z/... or #/l/... link (an old bookmark, a
+    // message someone forwarded) would otherwise silently fork the
+    // Recents entry away from the shared list everyone else edits.
+    const priorIsRemote = !!(prior && prior.hash && prior.hash.includes('~'));
+    const newIsRemote = !!(hashStr && hashStr.includes('~'));
+    const finalHash = (priorIsRemote && !newIsRemote) ? prior.hash : (hashStr || (prior && prior.hash) || null);
     const entry = {
       id: list.id,
       name: list.name,
       itemCount: list.items.length,
       updatedAt: list.updatedAt || now(),
-      hash: hashStr || (prior && prior.hash) || null,
+      hash: finalHash,
     };
     const h = loadHistory().filter(x => x.id !== list.id);
     h.unshift(entry);
@@ -852,6 +860,14 @@
       state.bucketId = null; state.slug = null;
       decodeStateAsync(route.scheme, route.data).then(list => {
         if (!list) { showToast(t('toast_invalid_link')); navHome(); return; }
+        // If this device already knows a live bucket for this exact list
+        // (e.g. this stale #/z/... link is an old bookmark, or got shared
+        // again after the list had already moved to a real bucket), jump
+        // straight there instead of resurrecting the frozen snapshot baked
+        // into this URL — editing it here would silently fork a second,
+        // disconnected copy via migrateEncodedToRemote below.
+        const known = loadHistory().find(h => h.id === list.id && h.hash && h.hash.includes('~'));
+        if (known) { location.hash = '#/' + known.hash; return; }
         state.list = list;
         state.selected = new Set();
         state.search = '';
