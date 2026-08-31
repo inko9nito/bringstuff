@@ -403,9 +403,28 @@
     const h = loadHistory().filter(x => x.id !== list.id);
     h.unshift(entry);
     saveHistory(h);
+    // Issue #47: always keep a full local copy of the list content, keyed
+    // by list id — independent of whatever hash/bucket the list happens
+    // to resolve through right now. This is the fallback that recovers a
+    // "not found" #/list/{id} link (e.g. the hash never got written
+    // because navList's async bucket creation hadn't finished yet, or the
+    // remote bucket has since become unreachable) on the same device.
+    cacheListSnapshot(list);
   }
   function getMe() { try { return localStorage.getItem(ME_KEY) || ''; } catch { return ''; } }
   function setMe(name) { try { localStorage.setItem(ME_KEY, name); } catch {} }
+
+  const LIST_SNAPSHOT_PREFIX = 'bringstuff:list:v1:';
+  function cacheListSnapshot(list) {
+    if (!list || !list.id) return;
+    try { localStorage.setItem(LIST_SNAPSHOT_PREFIX + list.id, JSON.stringify(toCompact(list))); } catch {}
+  }
+  function readListSnapshot(id) {
+    try {
+      const raw = localStorage.getItem(LIST_SNAPSHOT_PREFIX + id);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
 
   // ---------- Compact serialize ----------
   function compactAssignee(a) {
@@ -647,6 +666,15 @@
       kvdbPut(bucketId, payload).catch(() => {/* ignore transient errors */});
     }, 350);
   }
+  // Whether at least one push-panel (item detail, name editor, ...) is
+  // currently on top of the list view. While true, that panel is sitting
+  // on its own history entry (see openPanel), so replaceState below would
+  // land on the panel's entry instead of the list's — updateHashInPlace
+  // defers the URL write until the panel closes and we're really back on
+  // the list entry (see the popstate handler near closeTopPanel).
+  function panelIsOpen() { return !!(state.panels && state.panels.length); }
+  let pendingUrlResync = false;
+
   function updateHashInPlace(list) {
     // If we already have a bucket, PUT to it (debounced) and keep URL as-is.
     if (state.bucketId) {
@@ -654,17 +682,25 @@
       const wantSlug = makeSlug(list.name, list.updatedAt);
       if (wantSlug !== state.slug) {
         state.slug = wantSlug;
-        const newHash = slugHash(state.slug, state.bucketId);
-        const newUrl = location.pathname + location.search + newHash;
-        history.replaceState(null, '', newUrl);
+        if (panelIsOpen()) {
+          pendingUrlResync = true;
+        } else {
+          const newHash = slugHash(state.slug, state.bucketId);
+          const newUrl = location.pathname + location.search + newHash;
+          history.replaceState(null, '', newUrl);
+        }
       }
       scheduleRemotePut(state.bucketId, list);
       return Promise.resolve({ scheme: 'r', text: state.bucketId });
     }
     // Otherwise (legacy self-contained URL), update the hash payload as before.
     return encodeStateAsync(list).then(enc => {
-      const newUrl = location.pathname + location.search + makeHash(enc);
-      history.replaceState(null, '', newUrl);
+      if (panelIsOpen()) {
+        pendingUrlResync = true;
+      } else {
+        const newUrl = location.pathname + location.search + makeHash(enc);
+        history.replaceState(null, '', newUrl);
+      }
       return enc;
     });
   }
@@ -733,7 +769,18 @@
       }
       kvdbGet(route.bucketId).then(payload => {
         if (!payload) {
-          if (!state.list) { showToast(t('toast_list_not_found')); navHome(); }
+          if (!state.list) {
+            // Issue #47: this bucket is unreachable — either the backend
+            // migrated (old kvdb.io links are permanently dead) or this
+            // origin can't reach the function that serves it (e.g. a
+            // Netlify-only link opened from the GitHub Pages deployment).
+            // Drop the dead entry from Recents so it isn't offered again
+            // as a link that can never load.
+            const encBucket = encodeURIComponent(route.bucketId);
+            saveHistory(loadHistory().filter(x => !(x.hash && x.hash.endsWith('~' + encBucket))));
+            showToast(t('toast_list_not_found'));
+            navHome();
+          }
           return;
         }
         const list = fromCompact(payload);
@@ -772,8 +819,23 @@
         // Rewrite to the concrete URL and re-render through the normal flow.
         location.hash = '#/' + hist.hash;
       } else {
-        showToast(t('toast_list_not_found'));
-        navHome();
+        // Issue #47: no resolvable hash for this recent entry (most
+        // commonly the async bucket-creation hadn't written one back yet
+        // when this was tapped). Fall back to the full snapshot cached
+        // locally on every commit, so the list still opens on this device
+        // instead of a dead "not found".
+        const snap = readListSnapshot(route.id);
+        const list = snap && fromCompact(snap);
+        if (list) {
+          state.list = list;
+          state.selected = new Set();
+          state.bucketId = null; state.slug = null;
+          state.currentHashKey = 'snap:' + route.id;
+          renderList();
+        } else {
+          showToast(t('toast_list_not_found'));
+          navHome();
+        }
       }
     }
   }
@@ -1333,6 +1395,7 @@
     nodes.forEach(n => host.appendChild(n));
     document.body.appendChild(host);
     if (!state.panels) state.panels = [];
+    const wasEmpty = state.panels.length === 0;
     state.panels.push({ host });
     state.panel = state.panels[state.panels.length - 1];
     applyI18n(host);
@@ -1341,6 +1404,31 @@
     host.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => close()));
     if (panel) attachSwipeToDismiss(panel, close);
     if (setup) setup({ panel, close });
+    // Issue #51: give only the OUTERMOST panel its own history entry. An
+    // edge-swipe-back gesture can be captured by the OS/browser ahead of
+    // our own touch handlers (especially right at the screen edge), which
+    // then just calls the browser's native back navigation — with no
+    // panel-owned history entry, that pops straight past the list to
+    // Home. Pushing one entry here means that navigation only pops this
+    // marker, landing back on the list. Nested panels (e.g. the assignee
+    // editor over item detail) don't get their own entry — closing those
+    // is handled purely by our in-JS panel stack, same as a swipe already
+    // only affects the topmost panel.
+    if (wasEmpty) history.pushState({ bsPanel: true }, '', location.href);
+  }
+
+  function removePanelDom(entry, immediate) {
+    if (!entry || !entry.host || !entry.host.parentNode) return;
+    if (immediate) { entry.host.parentNode.removeChild(entry.host); return; }
+    const panel = entry.host.querySelector('.push-panel');
+    if (!panel) { entry.host.parentNode.removeChild(entry.host); return; }
+    panel.classList.add('closing');
+    const done = () => {
+      panel.removeEventListener('animationend', done);
+      if (entry.host.parentNode) entry.host.parentNode.removeChild(entry.host);
+    };
+    panel.addEventListener('animationend', done);
+    setTimeout(done, 400);
   }
 
   // Close a specific panel (by its host). Falls back to closing the top.
@@ -1349,18 +1437,37 @@
     const idx = state.panels.findIndex(p => p.host === host);
     const target = idx >= 0 ? state.panels.splice(idx, 1)[0] : state.panels.pop();
     state.panel = state.panels.length ? state.panels[state.panels.length - 1] : null;
-    if (!target || !target.host || !target.host.parentNode) return;
-    if (immediate) { target.host.parentNode.removeChild(target.host); return; }
-    const panel = target.host.querySelector('.push-panel');
-    if (!panel) { target.host.parentNode.removeChild(target.host); return; }
-    panel.classList.add('closing');
-    const done = () => {
-      panel.removeEventListener('animationend', done);
-      if (target.host.parentNode) target.host.parentNode.removeChild(target.host);
-    };
-    panel.addEventListener('animationend', done);
-    setTimeout(done, 400);
+    removePanelDom(target, immediate);
+    // The last panel closing (via our own JS, not a browser/OS back nav)
+    // needs to pop the marker entry pushed when it opened. That triggers
+    // the popstate handler below, which performs the deferred URL resync
+    // (if updateHashInPlace skipped a replaceState while this panel was
+    // open) once we've actually landed back on the list's own entry.
+    if (!state.panels.length && history.state && history.state.bsPanel) {
+      history.back();
+    }
   }
+
+  // Fires for the browser/OS back gesture (including an edge-swipe the OS
+  // captured before our own touch handlers saw it) as well as for the
+  // history.back() call above. If panels are still tracked here, this
+  // wasn't triggered by our own close flow (which already empties
+  // state.panels first) — close them all immediately, no animation, since
+  // the navigation has already happened. Either way, apply any URL sync
+  // that was deferred while a panel sat on top of the list's history entry.
+  window.addEventListener('popstate', () => {
+    if (state.panels && state.panels.length) {
+      while (state.panels.length) removePanelDom(state.panels.pop(), true);
+      state.panel = null;
+    }
+    if (pendingUrlResync) {
+      pendingUrlResync = false;
+      updateHashInPlace(state.list).then(enc => {
+        state.currentHashKey = enc.scheme + ':' + enc.text;
+        rememberList(state.list, enc);
+      });
+    }
+  });
 
   // Issue #16 — right-swipe dismisses a push panel (iOS nav-stack pop).
   function attachSwipeToDismiss(panel, close) {
@@ -1566,16 +1673,20 @@
         it.assignees = rows
           .filter(a => (a.name || '').trim())
           .map(a => makeAssignee(a.name, a.qty, a.note));
-        close();
+        // commit() before close(): updateHashInPlace needs to see this
+        // panel as still open (state.panels non-empty) to know it must
+        // defer the URL write until we're actually back on the list's
+        // history entry — see closeTopPanel / the popstate handler.
         commit();
+        close();
       });
 
       panel.querySelector('#btn-delete').addEventListener('click', () => {
         openConfirmDeleteSheet(() => {
           state.list.items = state.list.items.filter(x => x.id !== id);
           state.selected.delete(id);
-          close();
           commit();
+          close();
           showToast(t('toast_deleted'));
         });
       });
