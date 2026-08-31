@@ -1303,21 +1303,9 @@
     });
   }
 
-  // Issue #42: pinned share URLs for specific lists.
-  // The keys are lowercased list names — when a list has a matching name we
-  // hand out a stable status URL instead of the auto-generated hash link,
-  // so the same link keeps working even as the list mutates.
-  const PINNED_SHARE_URLS = {
-    'отдых': 'https://tinyurl.com/trip-2026-08',
-  };
-  function shareUrlFor(list) {
-    const key = String(list?.name || '').trim().toLowerCase();
-    return PINNED_SHARE_URLS[key] || location.href;
-  }
-
   function openShareSheet() {
     openSheet('tpl-share-sheet', ({ sheet }) => {
-      const url = shareUrlFor(state.list);
+      const url = location.href;
       sheet.querySelector('#share-url').textContent = url;
       sheet.querySelector('#url-length').textContent = t('url_length', url.length);
       const copyBtn = sheet.querySelector('#btn-copy');
