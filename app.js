@@ -66,7 +66,7 @@
       sort_alpha_asc: 'Name (A → Z)',
       sort_alpha_desc: 'Name (Z → A)',
       ae_note_ph: 'Details (optional, e.g. red wine)',
-      assign_to_other: 'Assign to someone else…',
+      assign_to_other: 'Someone else…',
       assign_to_prompt: 'Assign to…',
       other_person_title: 'Assign to someone',
       other_person_ph: 'Name',
@@ -94,6 +94,7 @@
       ae_name_ph: 'Name',
       ae_qty_ph: 'Qty',
       ae_add: '+ Add person',
+      ae_assign_other: 'Assign to…',
       no_matches: 'No matches',
       no_matches_hint: 'Try a different filter.',
       empty_title: 'Nothing here yet',
@@ -207,6 +208,7 @@
       ae_name_ph: 'Имя',
       ae_qty_ph: 'Кол.',
       ae_add: '+ Добавить',
+      ae_assign_other: 'Назначить…',
       no_matches: 'Ничего не найдено',
       no_matches_hint: 'Попробуй другой фильтр.',
       empty_title: 'Пока пусто',
@@ -1459,11 +1461,16 @@
     if (includeMe && me) addPill(me);
     for (const nm of uniqueAssigneeNames(list)) addPill(nm);
 
-    const otherBtn = document.createElement('button');
-    otherBtn.className = 'assignee-tag pill-pick pill-other';
-    otherBtn.textContent = t('assign_to_other');
-    otherBtn.addEventListener('click', onOther);
-    container.appendChild(otherBtn);
+    if (onOther) {
+      const otherBtn = document.createElement('button');
+      otherBtn.className = 'assignee-tag pill-pick pill-other';
+      otherBtn.textContent = t('assign_to_other');
+      otherBtn.addEventListener('click', onOther);
+      container.appendChild(otherBtn);
+    }
+    // Nothing to pick from (e.g. a fresh list with no assignees yet) — don't
+    // leave a hollow gap where the pills would be.
+    container.style.display = container.children.length ? '' : 'none';
   }
 
   function escapeHtml(s) {
@@ -1859,29 +1866,21 @@
           draw();
         });
         quickRow.appendChild(meBtn);
-        editor.appendChild(quickRow);
 
-        // Issue #59: pick an existing name from a pill row instead of
-        // always having to type one in.
-        const pickerHost = document.createElement('div');
-        pickerHost.className = 'assign-pill-row';
-        renderAssigneePills(pickerHost, {
-          list: state.list,
-          excludeNames: rows.map(a => a.name),
-          includeMe: false,
-          onPick: (name) => { rows.push(makeAssignee(name)); draw(); },
-          onOther: () => {
-            const fresh = makeAssignee();
-            openAssigneeView(fresh, (updated) => {
-              // Only add if the user actually gave a name.
-              if ((updated.name || '').trim()) {
-                rows.push(updated);
-                draw();
-              }
-            });
-          },
+        // Issue #59: "Assign to…" opens a sheet to pick an existing name
+        // or type a new one — no separate "someone else" hop needed.
+        const addBtn = document.createElement('button');
+        addBtn.className = 'ae-add';
+        addBtn.textContent = t('ae_assign_other');
+        addBtn.addEventListener('click', () => {
+          openAssigneePickerSheet({
+            excludeNames: rows.map(a => a.name),
+            onPick: (name) => { rows.push(makeAssignee(name)); draw(); },
+          });
         });
-        editor.appendChild(pickerHost);
+        quickRow.appendChild(addBtn);
+
+        editor.appendChild(quickRow);
       };
       draw();
 
@@ -1960,6 +1959,29 @@
         if (!name) return;
         close();
         bulkAssign(name);
+      };
+      sheet.querySelector('[data-confirm]').addEventListener('click', confirm);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirm(); } });
+    });
+  }
+
+  // Issue #59: single-item "Assign to…" — pick an existing name from a
+  // pill row, or type a new one and hit Enter, in one sheet.
+  function openAssigneePickerSheet({ excludeNames, onPick }) {
+    openSheet('tpl-assignee-picker-sheet', ({ sheet, close }) => {
+      renderAssigneePills(sheet.querySelector('#assignee-picker-pills'), {
+        list: state.list,
+        excludeNames,
+        includeMe: false,
+        onPick: (name) => { close(); onPick(name); },
+      });
+      const input = sheet.querySelector('#assignee-picker-input');
+      setTimeout(() => input.focus(), 60);
+      const confirm = () => {
+        const name = input.value.trim();
+        if (!name) return;
+        close();
+        onPick(name);
       };
       sheet.querySelector('[data-confirm]').addEventListener('click', confirm);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirm(); } });

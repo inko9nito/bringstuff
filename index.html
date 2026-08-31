@@ -226,6 +226,23 @@
     </div>
   </template>
 
+  <!-- Issue #59: single-item "Assign to…" sheet — pick a pill or type a name -->
+  <template id="tpl-assignee-picker-sheet">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <button class="sheet-btn" data-close data-t="cancel"></button>
+        <div class="sheet-title" data-t="ae_assign_other"></div>
+        <button class="sheet-btn primary" data-confirm data-t="save"></button>
+      </div>
+      <div class="sheet-body">
+        <div class="assign-pill-row" id="assignee-picker-pills"></div>
+        <input class="row-input solo" id="assignee-picker-input" type="text" autocomplete="off" autocapitalize="words" data-t-placeholder="other_person_ph" />
+      </div>
+    </div>
+  </template>
+
   <!-- Bulk actions sheet (selection overflow) -->
   <template id="tpl-bulk-actions-sheet">
     <div class="sheet-backdrop"></div>

@@ -691,6 +691,10 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .assign-pill-row--sheet {
   padding: 0 max(16px, var(--safe-left)) 12px max(16px, var(--safe-right));
 }
+/* Issue #59: pill row sits above the free-text input in the picker sheet. */
+#assignee-picker-pills {
+  margin-bottom: 10px;
+}
 .assign-pill-row .assignee-tag.pill-pick {
   padding: 6px 12px;
   font-size: 13px;
