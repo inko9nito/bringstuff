@@ -226,6 +226,41 @@ input:focus, textarea:focus, [contenteditable]:focus {
   box-shadow: var(--shadow);
 }
 .me-input::placeholder { color: var(--label-tertiary); font-weight: 400; }
+.me-save {
+  padding: 8px 14px;
+  color: white;
+  background: var(--tint);
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: var(--radius-pill);
+  min-height: 38px;
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+}
+.me-save:active { transform: scale(0.96); }
+
+/* Me-chip (top-right) — compact assignee-tinted pill for the current user */
+.nav-btn.me-chip {
+  padding: 6px 12px 6px 8px;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--a-fg, var(--label));
+  background: var(--a-bg, var(--surface));
+  max-width: 40vw;
+  min-width: 0;
+}
+.nav-btn.me-chip #me-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.me-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
 
 /* Pill-shape filter chips (like the top of the design inspo) */
 .chip-row {
@@ -775,6 +810,64 @@ input:focus, textarea:focus, [contenteditable]:focus {
   font-weight: 600;
   text-align: center;
   font-size: 14px;
+}
+
+/* ---------- Push panel (iOS-style item detail) ---------- */
+.push-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  animation: pushIn 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.02);
+  overflow: hidden;
+}
+.push-panel.closing {
+  animation: pushOut 0.24s cubic-bezier(0.4, 0, 0.9, 0.4) forwards;
+}
+@keyframes pushIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes pushOut {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+.push-topbar .nav-btn.tint { background: transparent; box-shadow: none; padding: 8px 10px; }
+.push-topbar .nav-btn.tint:active { opacity: 0.55; }
+.push-topbar .nav-btn.tint .back-label {
+  font-size: 17px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40vw;
+}
+.push-topbar .save-btn b { font-weight: 700; }
+.push-body {
+  padding: 12px max(20px, var(--safe-left)) calc(28px + var(--safe-bottom)) max(20px, var(--safe-right));
+}
+@media (min-width: 720px) {
+  .push-panel {
+    max-width: 640px;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: pushInCentered 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.02);
+    border-left: 0.5px solid var(--separator);
+    border-right: 0.5px solid var(--separator);
+  }
+  .push-panel.closing {
+    animation: pushOutCentered 0.24s cubic-bezier(0.4, 0, 0.9, 0.4) forwards;
+  }
+  @keyframes pushInCentered {
+    from { transform: translate(calc(-50% + 100%), 0); }
+    to { transform: translate(-50%, 0); }
+  }
+  @keyframes pushOutCentered {
+    from { transform: translate(-50%, 0); }
+    to { transform: translate(calc(-50% + 100%), 0); }
+  }
 }
 
 /* ---------- Toast ---------- */

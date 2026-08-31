@@ -43,7 +43,7 @@
       you_are: 'You are',
       your_name_ph: 'Your name',
       filter_all: 'All',
-      filter_open: 'Open',
+      filter_open: 'Not taken',
       filter_mine: 'Mine',
       filter_taken: 'Taken',
       add_item_ph: 'Add an item…',
@@ -98,6 +98,7 @@
       detected_hint: (n) => `Add these ${n} as separate items?`,
       add_all: 'Add all',
       default_list_name: 'Bring list',
+      change_name: 'Change name',
     },
     ru: {
       brand: 'BringStuff',
@@ -115,6 +116,7 @@
       filter_open: 'Свободно',
       filter_mine: 'Моё',
       filter_taken: 'Занято',
+      change_name: 'Изменить имя',
       add_item_ph: 'Добавить…',
       qty_ph: 'Кол.',
       paste_list: 'Вставить список…',
@@ -397,6 +399,7 @@
     filter: 'all',
     selected: new Set(),
     sheet: null,
+    panel: null,
     editingItemId: null,
   };
 
@@ -504,13 +507,42 @@
     titleEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
 
     const meInput = $('#me-input');
+    const meRow = $('#me-row');
+    const meChip = $('#me-chip');
+    const meSaveBtn = $('#me-save');
     meInput.value = state.me || getMe();
-    state.me = meInput.value;
-    meInput.addEventListener('input', () => {
+    state.me = meInput.value.trim();
+
+    const updateMeChip = () => {
+      const name = (state.me || '').trim();
+      if (name) {
+        meRow.hidden = true;
+        meChip.hidden = false;
+        $('#me-chip-name').textContent = name;
+        meChip.setAttribute('style', assigneeStyle(name));
+        meChip.title = t('change_name');
+      } else {
+        meRow.hidden = false;
+        meChip.hidden = true;
+      }
+    };
+    updateMeChip();
+
+    const saveMe = () => {
       state.me = meInput.value.trim();
       setMe(state.me);
+      updateMeChip();
       updateSelectionBar();
       renderItems();
+    };
+    meSaveBtn.addEventListener('click', saveMe);
+    meInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveMe(); meInput.blur(); } });
+    meInput.addEventListener('blur', saveMe);
+    meChip.addEventListener('click', () => {
+      meRow.hidden = false;
+      meChip.hidden = true;
+      // wait a tick for hidden to unset, then focus
+      setTimeout(() => { meInput.focus(); meInput.select(); }, 0);
     });
 
     $('#btn-back').addEventListener('click', () => navHome());
@@ -665,12 +697,14 @@
           </span>
         `;
 
+        // Issue #14: tap the checkmark to select; tap the row body to open.
         row.querySelector('[data-role="check"]').addEventListener('click', (e) => {
           e.stopPropagation(); toggleSelect(it.id);
         });
-        row.querySelector('[data-role="body"]').addEventListener('click', () => toggleSelect(it.id));
+        const openIt = () => openItemView(it.id);
+        row.querySelector('[data-role="body"]').addEventListener('click', openIt);
         row.querySelector('[data-role="edit"]').addEventListener('click', (e) => {
-          e.stopPropagation(); openItemSheet(it.id);
+          e.stopPropagation(); openIt();
         });
 
         container.appendChild(row);
@@ -809,21 +843,57 @@
     });
   }
 
-  function openItemSheet(id) {
+  // ---------- Push panel (iOS-style item detail) ----------
+  function openPanel(tplId, setup) {
+    closePanel(true);
+    const tpl = document.getElementById(tplId);
+    const wrap = document.createElement('div');
+    wrap.appendChild(tpl.content.cloneNode(true));
+    const nodes = Array.from(wrap.children);
+    const host = document.createElement('div');
+    host.className = 'panel-host';
+    nodes.forEach(n => host.appendChild(n));
+    document.body.appendChild(host);
+    state.panel = { host };
+    applyI18n(host);
+    const panel = host.querySelector('.push-panel');
+    const close = () => closePanel();
+    host.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
+    if (setup) setup({ panel, close });
+  }
+  function closePanel(immediate = false) {
+    if (!state.panel) return;
+    const { host } = state.panel;
+    state.panel = null;
+    if (!host || !host.parentNode) return;
+    if (immediate) { host.parentNode.removeChild(host); return; }
+    const panel = host.querySelector('.push-panel');
+    if (!panel) { host.parentNode.removeChild(host); return; }
+    panel.classList.add('closing');
+    const done = () => {
+      panel.removeEventListener('animationend', done);
+      if (host.parentNode) host.parentNode.removeChild(host);
+    };
+    panel.addEventListener('animationend', done);
+    setTimeout(done, 400);
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.panel) closePanel(); });
+
+  function openItemView(id) {
     const it = state.list.items.find(x => x.id === id);
     if (!it) return;
     state.editingItemId = id;
-    openSheet('tpl-item-sheet', ({ sheet, close }) => {
-      const nameI = sheet.querySelector('#edit-name');
-      const qtyI = sheet.querySelector('#edit-qty');
-      const noteI = sheet.querySelector('#edit-note');
-      const editor = sheet.querySelector('#assignee-editor');
+    openPanel('tpl-item-view', ({ panel, close }) => {
+      panel.querySelector('.back-label').textContent = state.list.name || t('nav_lists');
+      const nameI = panel.querySelector('#edit-name');
+      const qtyI = panel.querySelector('#edit-qty');
+      const noteI = panel.querySelector('#edit-note');
+      const editor = panel.querySelector('#assignee-editor');
 
       nameI.value = it.name;
       qtyI.value = it.qty || '';
       noteI.value = it.note || '';
 
-      // Build assignee editor rows
       const rows = it.assignees.map(parseAssignee);
       const draw = () => {
         editor.innerHTML = '';
@@ -857,7 +927,6 @@
         addBtn.addEventListener('click', () => {
           rows.push({ name: '', qty: null });
           draw();
-          // focus new input
           const inputs = editor.querySelectorAll('.ae-name');
           if (inputs.length) inputs[inputs.length - 1].focus();
         });
@@ -865,10 +934,7 @@
       };
       draw();
 
-      nameI.focus();
-      nameI.select();
-
-      sheet.querySelector('[data-confirm]').addEventListener('click', () => {
+      panel.querySelector('[data-confirm]').addEventListener('click', () => {
         const name = nameI.value.trim();
         if (!name) { showToast(t('toast_name_required')); return; }
         it.name = name;
@@ -882,7 +948,7 @@
         commit();
       });
 
-      sheet.querySelector('#btn-delete').addEventListener('click', () => {
+      panel.querySelector('#btn-delete').addEventListener('click', () => {
         state.list.items = state.list.items.filter(x => x.id !== id);
         state.selected.delete(id);
         close();
