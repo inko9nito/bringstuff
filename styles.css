@@ -310,6 +310,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
   padding: 0 max(20px, var(--safe-left)) 14px max(20px, var(--safe-right));
   overflow-x: auto;
   scroll-snap-type: x mandatory;
+  scroll-padding-left: max(20px, var(--safe-left));
   scrollbar-width: none;
 }
 .chip-row::-webkit-scrollbar { display: none; }
