@@ -85,7 +85,7 @@
       paste_example: 'Charcoal ✅ Bella\nLighter fluid\nBuns for burgers x8',
       replace_existing: 'Replace existing items',
       edit_item: 'Edit item',
-      field_name: 'Name',
+      field_name: 'Item',
       field_qty: 'Total quantity (optional)',
       field_qty_ph: 'e.g. 2',
       field_note: 'Note (optional)',
