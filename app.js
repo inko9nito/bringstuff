@@ -898,9 +898,19 @@
         }
         // Only re-render if the remote is different from what we already show.
         const changed = !state.list || JSON.stringify(toCompact(state.list)) !== JSON.stringify(payload);
-        state.list = list;
+        // Issue #94: when the fetch content matches what we already show
+        // (server confirms the cached instant-paint), keep the existing
+        // state.list object identity. The list-render's click handlers
+        // (submitAdd in particular) captured that object in a closure and
+        // mutate its .items; swapping in a content-identical *new* object
+        // orphans those handlers — the next click concats onto the old
+        // object while commit() serializes the new one, so the toast
+        // fires and the added items silently vanish. Only replace the
+        // reference when we're actually going to renderList() below,
+        // which rebuilds the closures against the new object.
+        if (changed) state.list = list;
         state.currentHashKey = hashKey;
-        rememberList(list, null);
+        rememberList(state.list, null);
         if (changed) renderList();
       });
       return;
