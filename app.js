@@ -1065,12 +1065,6 @@
     autoGrow();
     updateAddLabel();
 
-    const scroll = $('.scroll');
-    const topbar = $('.topbar');
-    scroll.addEventListener('scroll', () => {
-      topbar.classList.toggle('scrolled', scroll.scrollTop > 4);
-    });
-
     $('#sel-clear').addEventListener('click', () => {
       state.selected.clear();
       updateSelectionBar();
