@@ -122,7 +122,6 @@
       you_are_hint: "Your name is remembered on this device and shown next to items you're bringing.",
       field_your_name: 'Name',
       ae_detail_label: 'Details',
-      back_to_item: 'Item',
       ae_empty_name: '(no name)',
       ae_qty_label: 'Qty',
     },
@@ -149,14 +148,14 @@
       you_are_title: 'Твоё имя',
       you_are_hint: 'Имя сохраняется на этом устройстве и показывается рядом с тем, что ты везёшь.',
       field_your_name: 'Имя',
-      add_item_ph: 'Добавить пункты — по одному в строке…',
+      add_item_ph: 'Что взять? (по одному на строку)',
       add_n_items: (n) => `Добавить ${n}`,
       qty_ph: 'Кол.',
       paste_list: 'Вставить список…',
       stats: (done, total) => `${done} из ${total} разобрано`,
       sel_clear: 'Отмена',
       sel_count: (n) => `${n} выбрано`,
-      assign_to: () => 'На меня',
+      assign_to: () => 'Записаться',
       cancel: 'Отмена',
       confirm_delete_title: 'Удалить пункт?',
       confirm_delete_hint: 'Это нельзя отменить.',
@@ -239,7 +238,6 @@
       add_all: 'Добавить все',
       default_list_name: 'Список',
       ae_detail_label: 'Детали',
-      back_to_item: 'Пункт',
       ae_empty_name: '(без имени)',
       ae_qty_label: 'Кол.',
     },
@@ -982,42 +980,32 @@
     meChip.addEventListener('click', () => openNameView(updateMeChip));
 
     $('#btn-back').addEventListener('click', () => navHome());
-    $('#btn-share').addEventListener('click', () => copyShareLink(list));
 
-    // Issue #15: search grows the button into a pill input between the list
-    // name and the share button, filtering items by name/note as you type.
-    // The title stays visible (just yields room) rather than disappearing.
-    const titleRow = $('#title-row');
-    const searchBtn = $('#btn-search');
+    // Issue #84: search is an always-present bar (no toggle button), with
+    // a clear button that only shows once there's a query. Re-render may
+    // run while a search is already active (e.g. checking an item off
+    // mid-search) — restore the input from state.search instead of
+    // resetting it.
     const searchInput = $('#search-input');
     const searchClearBtn = $('#btn-search-clear');
-    const openSearch = () => {
-      titleRow.classList.add('searching');
+    const updateSearchClear = () => { searchClearBtn.hidden = !searchInput.value; };
+    searchInput.value = state.search || '';
+    updateSearchClear();
+    const clearSearch = () => {
+      state.search = '';
+      searchInput.value = '';
+      updateSearchClear();
+      renderItems();
       searchInput.focus();
     };
-    const closeSearch = () => {
-      titleRow.classList.remove('searching');
-      if (state.search) {
-        state.search = '';
-        searchInput.value = '';
-        renderItems();
-      }
-    };
-    // Re-render may run while a search is already active (e.g. checking an
-    // item off mid-search) — restore the UI to match state.search instead
-    // of resetting it.
-    if (state.search) {
-      titleRow.classList.add('searching');
-      searchInput.value = state.search;
-    }
-    searchBtn.addEventListener('click', openSearch);
-    searchClearBtn.addEventListener('click', closeSearch);
+    searchClearBtn.addEventListener('click', clearSearch);
     searchInput.addEventListener('input', () => {
       state.search = searchInput.value;
+      updateSearchClear();
       renderItems();
     });
     searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
+      if (e.key === 'Escape' && searchInput.value) { e.preventDefault(); clearSearch(); }
     });
 
     // Issue #12: sort chip opens a bottom-sheet with sort options.
@@ -1446,6 +1434,8 @@
     return PINNED_SHARE_URLS[key] || location.href;
   }
 
+  // Issue #84: the header's Share button is dropped for now (per the
+  // toolbar cleanup) — this stays unused pending its return in a follow-up.
   async function copyShareLink(list) {
     const url = shareUrlFor(list);
     try {
@@ -1629,7 +1619,6 @@
 
   function openNameView(onSave) {
     openPanel('tpl-name-view', ({ panel, close }) => {
-      panel.querySelector('.back-label').textContent = state.list?.name || t('nav_lists');
       const input = panel.querySelector('#name-input');
       input.value = state.me || '';
       // Focus after the slide-in animation so the keyboard doesn't
