@@ -541,12 +541,24 @@
     } catch { return null; }
   }
 
+  // Issue #77: a Cyrillic slug survives fine in the URL, but copy-pasting it
+  // into most messaging apps turns it into %D0%BE%D1%82%D0%B4... gibberish
+  // since it isn't ASCII. Transliterate so the human-readable part of the
+  // URL is always plain letters, regardless of what script the name uses.
+  const CYRILLIC_TRANSLIT = {
+    а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z',
+    и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
+    с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh',
+    щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+  };
+  function transliterate(s) {
+    return s.replace(/[а-яё]/g, (ch) => CYRILLIC_TRANSLIT[ch] ?? ch);
+  }
   function makeSlug(name, dateMs) {
     const d = new Date(dateMs || Date.now());
     const ym = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0');
     // Allow Unicode letters + digits, collapse everything else to a single dash.
-    let clean = String(name || '')
-      .toLowerCase()
+    let clean = transliterate(String(name || '').toLowerCase())
       .replace(/[^\p{L}\p{N}]+/gu, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 40);
@@ -794,6 +806,36 @@
   // ---------- Rendering ----------
   const appEl = document.getElementById('app');
 
+  // Pull the bucket id out of a pinned canonical URL's own hash, so a
+  // resolved list can be checked against it regardless of which route
+  // found that list.
+  function pinnedBucketId(name) {
+    const key = String(name || '').trim().toLowerCase();
+    const pinned = PINNED_SHARE_URLS[key];
+    if (!pinned) return null;
+    try {
+      const h = new URL(pinned).hash || '';
+      const tail = decodeURIComponent(h.slice(2));
+      const tildeIdx = tail.lastIndexOf('~');
+      return tildeIdx > 0 ? tail.slice(tildeIdx + 1) : null;
+    } catch { return null; }
+  }
+  // A pinned list (currently just "Отдых") must never be allowed to render
+  // or be edited from anywhere but its one true bucket — a stale link, an
+  // interrupted migration, or any other path that ends up resolving a list
+  // by that name against a *different* bucket is a fork in the making.
+  // Whenever that happens, hard-redirect (even cross-origin, so an old
+  // GitHub Pages link converges too) onto the canonical URL instead of
+  // rendering the divergent copy. Returns true if it redirected.
+  function redirectToPinnedIfDiverged(list, currentBucketId) {
+    const bid = pinnedBucketId(list && list.name);
+    if (bid && bid !== currentBucketId) {
+      location.href = PINNED_SHARE_URLS[String(list.name).trim().toLowerCase()];
+      return true;
+    }
+    return false;
+  }
+
   function render() {
     const route = parseHash();
     if (route.name === 'home') {
@@ -809,7 +851,9 @@
       // Try cache first for instant paint, then refresh from remote.
       const cached = readRemoteCache(route.bucketId);
       if (cached) {
-        state.list = fromCompact(cached);
+        const cachedList = fromCompact(cached);
+        if (redirectToPinnedIfDiverged(cachedList, route.bucketId)) return;
+        state.list = cachedList;
         state.selected = new Set();
         state.search = '';
         state.currentHashKey = hashKey;
@@ -833,6 +877,10 @@
         }
         const list = fromCompact(payload);
         if (!list) return;
+        // This bucket claims a name that's pinned to a *different* bucket —
+        // someone diverged. Converge onto the canonical one instead of
+        // showing/caching this fork.
+        if (redirectToPinnedIfDiverged(list, route.bucketId)) return;
         cacheRemote(route.bucketId, payload);
         // Issue #75: this fetch was already in flight when it started, so a
         // local edit (e.g. adding items) can land while we're waiting on it.
@@ -868,6 +916,10 @@
         // disconnected copy via migrateEncodedToRemote below.
         const known = loadHistory().find(h => h.id === list.id && h.hash && h.hash.includes('~'));
         if (known) { location.hash = '#/' + known.hash; return; }
+        // Fallback for a device with no local history at all (or a
+        // history that already got clobbered): a pinned name always wins,
+        // regardless of what this particular link remembers.
+        if (redirectToPinnedIfDiverged(list, null)) return;
         state.list = list;
         state.selected = new Set();
         state.search = '';
