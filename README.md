@@ -15,3 +15,9 @@ Open `index.html` in a browser. No build step, no dependencies.
 ## Deployment
 
 Published to GitHub Pages via `.github/workflows/pages.yml`.
+
+**One-time setup:** open the repo on GitHub → **Settings** → **Pages** →
+under *Build and deployment* set **Source** to **GitHub Actions**, then
+re-run the latest workflow (Actions → *Deploy to GitHub Pages* → *Re-run
+all jobs*). After that every push to `main` or the current dev branch
+publishes automatically.
