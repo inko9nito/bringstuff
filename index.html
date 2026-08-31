@@ -71,9 +71,14 @@
         </button>
       </div>
       <div class="me-row" id="me-row">
-        <label for="me-input" class="me-label" data-t="you_are"></label>
-        <input id="me-input" class="me-input" type="text" data-t-placeholder="your_name_ph" autocomplete="off" />
-        <button class="me-save" id="me-save" data-t="save"></button>
+        <div class="me-welcome">
+          <p class="me-welcome-title" data-t="welcome_title"></p>
+          <label for="me-input" class="me-welcome-hint" data-t="welcome_hint"></label>
+          <div class="me-welcome-form">
+            <input id="me-input" class="me-input" type="text" data-t-placeholder="your_name_ph" autocomplete="off" />
+            <button class="me-save" id="me-save" data-t="save"></button>
+          </div>
+        </div>
       </div>
       <div class="chip-row" id="filter-seg">
         <button class="chip sort-chip" id="btn-sort" aria-label="Sort">
@@ -87,13 +92,15 @@
     </header>
 
     <main class="scroll">
-      <div class="card list-grouped" id="items"></div>
       <div class="add-block">
-        <div class="card spaced">
+        <div class="card add-row">
           <textarea class="add-textarea" id="add-input" rows="1" data-t-placeholder="add_item_ph" autocomplete="off" autocapitalize="sentences"></textarea>
-          <button class="row-button primary" id="btn-add"><span id="btn-add-label" data-t="add"></span></button>
+          <button class="add-check-btn" id="btn-add" aria-label="Add item">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
         </div>
       </div>
+      <div class="card list-grouped" id="items"></div>
 
       <div class="footnote" id="stat-line"></div>
     </main>

@@ -245,17 +245,33 @@ input:focus, textarea:focus, [contenteditable]:focus {
   box-shadow: 0 1px 2px rgba(15,12,41,0.08);
 }
 
+/* Issue #63: first-time name entry gets its own boxed, welcoming card
+   instead of blending in as a plain inline row. */
 .me-row {
+  padding: 0 max(20px, var(--safe-left)) 14px max(20px, var(--safe-right));
+}
+.me-welcome {
+  background: var(--tint-soft);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.me-welcome-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--label);
+}
+.me-welcome-hint {
+  display: block;
+  margin: 2px 0 12px;
+  color: var(--label-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+.me-welcome-form {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 max(20px, var(--safe-left)) 12px max(20px, var(--safe-right));
-}
-.me-label {
-  color: var(--label-secondary);
-  font-size: 15px;
-  font-weight: 500;
-  padding-left: 4px;
 }
 .me-input {
   flex: 1;
@@ -366,8 +382,6 @@ input:focus, textarea:focus, [contenteditable]:focus {
   margin-left: max(20px, var(--safe-left));
   margin-right: max(20px, var(--safe-right));
 }
-/* And bring the add-block gutter to the same 20px so its card lines up too. */
-.add-block { padding-left: max(20px, var(--safe-left)); padding-right: max(20px, var(--safe-right)); }
 
 /* ---------- Hero (home) ---------- */
 .hero {
@@ -634,17 +648,26 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .row-icon-btn:active { opacity: 0.85; transform: scale(0.94); }
 .row-icon-btn:disabled { background: var(--label-quaternary); box-shadow: none; }
 
+/* Issue #58: add row moved to the top of the list, made small and inline
+   with a round checkmark button instead of a full-width "Add" pill. */
 .add-block {
-  padding: 20px max(16px, var(--safe-left)) 0 max(16px, var(--safe-right));
+  padding: 4px max(20px, var(--safe-left)) 14px max(20px, var(--safe-right));
+}
+.add-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 4px 4px 4px 16px;
 }
 .add-textarea {
-  width: 100%;
-  min-height: 46px;
+  flex: 1;
+  min-width: 0;
+  min-height: 24px;
   max-height: 40vh;
   border: 0;
-  padding: 12px 16px;
-  font-size: 17px;
-  line-height: 1.4;
+  padding: 9px 0;
+  font-size: 15px;
+  line-height: 1.35;
   background: transparent;
   resize: none;
   font-family: inherit;
@@ -653,6 +676,23 @@ input:focus, textarea:focus, [contenteditable]:focus {
   overflow-y: auto;
 }
 .add-textarea::placeholder { color: var(--label-tertiary); }
+.add-check-btn {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 4px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--tint);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(108, 92, 231, 0.3);
+  transition: transform 0.15s, opacity 0.15s, background 0.15s;
+}
+.add-check-btn:active { transform: scale(0.9); }
+.add-check-btn:disabled { background: var(--label-quaternary); box-shadow: none; opacity: 0.7; }
 
 .footnote {
   padding: 20px 24px 12px 24px;
