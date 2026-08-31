@@ -724,6 +724,25 @@ input:focus, textarea:focus, [contenteditable]:focus {
   /* Issue #84 follow-up: less rounded than the pill-shaped search bar so
      the two aren't mistaken for one another; matches the item list's card. */
   border-radius: var(--radius-sm);
+  /* Issue #89: a visible border (thicker than the 0.5px hairlines used
+     elsewhere) so the add box reads as distinct from the search pill and
+     draws the eye. */
+  border: 1.5px solid var(--separator);
+}
+/* Issue #89: plus icon before the placeholder, sized and shaped like the
+   row-check circles in the item list for visual consistency. */
+.add-icon {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 9px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--fill-tertiary);
+  color: var(--label-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .add-textarea {
   flex: 1;
