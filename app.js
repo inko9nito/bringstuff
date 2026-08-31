@@ -62,6 +62,15 @@
       sort_date_desc: 'Date added (newest first)',
       sort_alpha_asc: 'Name (A → Z)',
       sort_alpha_desc: 'Name (Z → A)',
+      ae_note_ph: 'Details (optional, e.g. red wine)',
+      assign_to_name: (name) => `Assign to ${name}`,
+      assign_to_other: 'Assign to someone else…',
+      other_person_title: 'Assign to someone',
+      other_person_ph: 'Name',
+      bulk_actions_title: (n) => `${n} selected`,
+      bulk_delete: (n) => `Delete ${n} item${n === 1 ? '' : 's'}`,
+      confirm_bulk_delete_title: (n) => `Delete ${n} item${n === 1 ? '' : 's'}?`,
+      toast_bulk_deleted: (n) => `Deleted ${n} item${n === 1 ? '' : 's'}`,
       add: 'Add',
       done: 'Done',
       save: 'Save',
@@ -148,6 +157,25 @@
       sort_date_desc: 'По дате (сначала новые)',
       sort_alpha_asc: 'По названию (А → Я)',
       sort_alpha_desc: 'По названию (Я → А)',
+      ae_note_ph: 'Что везёт (напр. красное вино)',
+      assign_to_name: (name) => `На ${name}`,
+      assign_to_other: 'На кого-то ещё…',
+      other_person_title: 'Записать на',
+      other_person_ph: 'Имя',
+      bulk_actions_title: (n) => `${n} выбрано`,
+      bulk_delete: (n) => {
+        const m10 = n % 10, m100 = n % 100;
+        if (m10 === 1 && m100 !== 11) return `Удалить ${n} пункт`;
+        if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return `Удалить ${n} пункта`;
+        return `Удалить ${n} пунктов`;
+      },
+      confirm_bulk_delete_title: (n) => {
+        const m10 = n % 10, m100 = n % 100;
+        if (m10 === 1 && m100 !== 11) return `Удалить ${n} пункт?`;
+        if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return `Удалить ${n} пункта?`;
+        return `Удалить ${n} пунктов?`;
+      },
+      toast_bulk_deleted: (n) => `Удалено: ${n}`,
       add: 'Добавить',
       done: 'Готово',
       save: 'Сохранить',
@@ -252,7 +280,8 @@
   }
 
   // ---------- Data model ----------
-  // Item.assignees: string[] where each entry is "Name" or "Name:qty"
+  // Item.assignees: Array of { name, qty, note } objects (in-memory).
+  // Compact URL storage keeps back-compat with legacy string form.
   const emptyList = (name = '') => ({
     id: uid(6),
     name: name || (STRINGS[state?.lang || 'en'] || STRINGS.en).default_list_name,
@@ -268,14 +297,18 @@
     done: false,
   });
 
-  function parseAssignee(str) {
-    const m = String(str || '').match(/^(.*?)(?::\s*(\d{1,3}))?\s*$/);
-    if (!m) return { name: String(str || '').trim(), qty: null };
-    return { name: (m[1] || '').trim(), qty: m[2] ? parseInt(m[2], 10) : null };
+  function makeAssignee(name = '', qty = null, note = '') {
+    return { name: String(name || '').trim(), qty: qty && Number(qty) > 0 ? Number(qty) : null, note: String(note || '').trim() };
   }
-  function stringifyAssignee(obj) {
-    const q = obj && obj.qty && Number(obj.qty) > 0 ? `:${Number(obj.qty)}` : '';
-    return `${(obj && obj.name || '').trim()}${q}`;
+  // Accept legacy "Name" / "Name:qty" strings, new tuples [name, qty, note],
+  // and in-memory objects. Always returns a normalized { name, qty, note }.
+  function normalizeAssignee(v) {
+    if (Array.isArray(v)) return makeAssignee(v[0], v[1], v[2]);
+    if (v && typeof v === 'object') return makeAssignee(v.name, v.qty, v.note);
+    const s = String(v || '');
+    const m = s.match(/^(.*?)(?::\s*(\d{1,3}))?\s*$/);
+    if (!m) return makeAssignee(s);
+    return makeAssignee(m[1], m[2] ? parseInt(m[2], 10) : null);
   }
 
   // ---------- Parser for pasted lines ----------
@@ -320,7 +353,7 @@
       for (const n of names) {
         const words = n.split(/\s+/);
         if (words.length <= 3 && /^\p{Lu}/u.test(words[0])) {
-          assignees.push(n);
+          assignees.push(makeAssignee(n));
         } else {
           notes.push(n);
         }
@@ -376,6 +409,17 @@
   function setMe(name) { try { localStorage.setItem(ME_KEY, name); } catch {} }
 
   // ---------- Compact serialize ----------
+  function compactAssignee(a) {
+    const name = a.name || '';
+    const qty = a.qty || 0;
+    const note = a.note || '';
+    // Keep the URL small: fall back to a plain string when there's no
+    // qty and no per-assignee note (the common case), matching legacy
+    // format so old readers still parse it.
+    if (!qty && !note) return name;
+    if (!note) return `${name}:${qty}`;
+    return [name, qty, note];
+  }
   function toCompact(list) {
     return {
       v: 1,
@@ -383,7 +427,9 @@
       n: list.name,
       u: list.updatedAt,
       i: list.items.map(it => [
-        it.id, it.name, it.qty ?? 0, it.assignees || [], it.note || '', it.done ? 1 : 0,
+        it.id, it.name, it.qty ?? 0,
+        (it.assignees || []).map(compactAssignee),
+        it.note || '', it.done ? 1 : 0,
       ]),
     };
   }
@@ -397,7 +443,7 @@
         id: a[0] || uid(5),
         name: a[1] || '',
         qty: a[2] ? Number(a[2]) : null,
-        assignees: Array.isArray(a[3]) ? a[3].map(String) : [],
+        assignees: Array.isArray(a[3]) ? a[3].map(normalizeAssignee) : [],
         note: a[4] || '',
         done: !!a[5],
       })),
@@ -643,6 +689,7 @@
     list: null,
     me: '',
     filter: 'all',
+    filterPerson: '',
     sort: 'date_asc',
     selected: new Set(),
     sheet: null,
@@ -866,7 +913,8 @@
       btn.classList.toggle('active', btn.dataset.filter === state.filter);
       btn.addEventListener('click', () => {
         state.filter = btn.dataset.filter;
-        $$('#filter-seg .chip[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter === state.filter));
+        state.filterPerson = '';
+        syncFilterChips();
         renderItems();
         // Issue #32: reset scroll so a shorter filtered list isn't
         // stranded below the previous scroll offset.
@@ -874,6 +922,7 @@
         if (sc) sc.scrollTop = 0;
       });
     });
+    syncFilterChips();
 
     // Issue #20: add block is now a multi-line textarea. Enter makes a new
     // line; Save reads every non-blank line and adds each as its own item.
@@ -928,33 +977,26 @@
     $('#sel-assign').addEventListener('click', () => {
       const me = (state.me || '').trim();
       if (!me) { showToast(t('toast_enter_name')); $('#me-input').focus(); return; }
-      let changed = 0;
-      for (const id of state.selected) {
-        const it = list.items.find(x => x.id === id);
-        if (!it) continue;
-        const already = it.assignees.some(a => parseAssignee(a).name.toLowerCase() === me.toLowerCase());
-        if (!already) { it.assignees.push(me); changed++; }
-      }
-      state.selected.clear();
-      if (changed) {
-        commit();
-        showToast(t('toast_assigned', changed, me));
-      } else {
-        updateSelectionBar();
-        renderItems();
-      }
+      bulkAssign(me);
     });
+    // Issue #8: overflow menu on the selection bar
+    const overflow = $('#sel-overflow');
+    if (overflow) overflow.addEventListener('click', () => openBulkActionsSheet());
 
     renderItems();
   }
 
   function itemMatchesFilter(it) {
     const me = (state.me || '').trim().toLowerCase();
-    const hasMe = () => me && it.assignees.some(a => parseAssignee(a).name.toLowerCase() === me);
+    const hasMe = () => me && it.assignees.some(a => a.name.toLowerCase() === me);
     switch (state.filter) {
       case 'open': return it.assignees.length === 0;
       case 'mine': return hasMe();
       case 'taken': return it.assignees.length > 0;
+      case 'person': {
+        const p = (state.filterPerson || '').toLowerCase();
+        return !!p && it.assignees.some(a => a.name.toLowerCase() === p);
+      }
       default: return true;
     }
   }
@@ -982,7 +1024,7 @@
     for (const it of list.items) {
       if (it.assignees.length === 0) counts.open++;
       else counts.taken++;
-      if (me && it.assignees.some(a => parseAssignee(a).name.toLowerCase() === me)) counts.mine++;
+      if (me && it.assignees.some(a => a.name.toLowerCase() === me)) counts.mine++;
     }
     const setCnt = (id, n) => {
       const el = document.getElementById(id);
@@ -1008,15 +1050,21 @@
         const isSelected = state.selected.has(it.id);
         const qtyLabel = it.qty && it.qty > 1 ? ` <span class="qty">×${it.qty}</span>` : '';
 
-        const tags = it.assignees.map(str => {
-          const a = parseAssignee(str);
+        const tags = it.assignees.map(a => {
           if (!a.name) return '';
           const isMe = me && a.name.toLowerCase() === me;
           const q = a.qty && a.qty > 0 ? `<span class="a-qty">×${a.qty}</span>` : '';
-          return `<span class="assignee-tag${isMe ? ' mine' : ''}" style="${assigneeStyle(a.name)}">${escapeHtml(a.name)}${q}</span>`;
+          const hasNote = a.note ? ' has-note' : '';
+          const titleAttr = a.note ? ` title="${escapeHtml(a.note)}"` : '';
+          return `<button class="assignee-tag${isMe ? ' mine' : ''}${hasNote}" data-role="filter-person" data-name="${escapeHtml(a.name)}" style="${assigneeStyle(a.name)}"${titleAttr}>${escapeHtml(a.name)}${q}</button>`;
         }).join('');
 
-        const note = it.note ? `<div class="row-note">${escapeHtml(it.note)}</div>` : '';
+        // Issue #21: show each per-assignee note on its own line under the row.
+        const assigneeNotes = it.assignees
+          .filter(a => a.name && a.note)
+          .map(a => `<div class="row-assignee-note"><b>${escapeHtml(a.name)}:</b> ${escapeHtml(a.note)}</div>`)
+          .join('');
+        const note = (it.note ? `<div class="row-note">${escapeHtml(it.note)}</div>` : '') + assigneeNotes;
 
         row.innerHTML = `
           <button class="check ${isSelected ? 'checked' : ''}" aria-label="Select" data-role="check">
@@ -1040,6 +1088,13 @@
         row.querySelector('[data-role="body"]').addEventListener('click', openIt);
         row.querySelector('[data-role="edit"]').addEventListener('click', (e) => {
           e.stopPropagation(); openIt();
+        });
+        // Issue #3: tap an assignee tag to filter the list by that person.
+        row.querySelectorAll('[data-role="filter-person"]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setPersonFilter(btn.dataset.name);
+          });
         });
 
         container.appendChild(row);
@@ -1067,6 +1122,95 @@
     bar.hidden = false;
     $('#sel-count').textContent = t('sel_count', n);
     $('#sel-assign').textContent = t('assign_to');
+  }
+
+  function setPersonFilter(name) {
+    const clean = String(name || '').trim();
+    if (!clean) return;
+    state.filter = 'person';
+    state.filterPerson = clean;
+    syncFilterChips();
+    renderItems();
+    const sc = $('.scroll');
+    if (sc) sc.scrollTop = 0;
+  }
+
+  // Rebuild the active state of the filter chips and show/hide the
+  // person-filter pill. Called on every filter change so state and
+  // chips stay in sync (including the person chip's visibility).
+  function syncFilterChips() {
+    const seg = $('#filter-seg');
+    if (!seg) return;
+    $$('#filter-seg .chip[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter === state.filter));
+    let personChip = $('#filter-seg .chip.person-chip');
+    if (state.filter === 'person' && state.filterPerson) {
+      if (!personChip) {
+        personChip = document.createElement('button');
+        personChip.className = 'chip person-chip active';
+        personChip.innerHTML = '<span class="person-chip-name"></span><span class="person-chip-x" aria-hidden="true">×</span>';
+        personChip.addEventListener('click', () => {
+          state.filter = 'all';
+          state.filterPerson = '';
+          syncFilterChips();
+          renderItems();
+        });
+        seg.appendChild(personChip);
+      }
+      personChip.querySelector('.person-chip-name').textContent = state.filterPerson;
+      personChip.setAttribute('style', assigneeStyle(state.filterPerson));
+      personChip.scrollIntoView({ inline: 'end', block: 'nearest' });
+    } else if (personChip) {
+      personChip.remove();
+    }
+  }
+
+  // Issue #8: bulk assign helper, shared by the "Assign to me" pill and the
+  // overflow menu's Assign-to-someone action.
+  function bulkAssign(name) {
+    const list = state.list;
+    if (!list) return;
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return;
+    let changed = 0;
+    for (const id of state.selected) {
+      const it = list.items.find(x => x.id === id);
+      if (!it) continue;
+      const already = it.assignees.some(a => a.name.toLowerCase() === trimmed.toLowerCase());
+      if (!already) { it.assignees.push(makeAssignee(trimmed)); changed++; }
+    }
+    state.selected.clear();
+    if (changed) {
+      commit();
+      showToast(t('toast_assigned', changed, trimmed));
+    } else {
+      updateSelectionBar();
+      renderItems();
+    }
+  }
+
+  function bulkDelete() {
+    const list = state.list;
+    if (!list) return;
+    const ids = new Set(state.selected);
+    if (!ids.size) return;
+    const n = ids.size;
+    list.items = list.items.filter(x => !ids.has(x.id));
+    state.selected.clear();
+    commit();
+    showToast(t('toast_bulk_deleted', n));
+  }
+
+  function uniqueAssigneeNames(list) {
+    const seen = new Map();
+    for (const it of (list.items || [])) {
+      for (const a of (it.assignees || [])) {
+        const n = (a.name || '').trim();
+        if (!n) continue;
+        const key = n.toLowerCase();
+        if (!seen.has(key)) seen.set(key, n);
+      }
+    }
+    return Array.from(seen.values());
   }
 
   function escapeHtml(s) {
@@ -1319,28 +1463,36 @@
       qtyI.value = it.qty || '';
       noteI.value = it.note || '';
 
-      const rows = it.assignees.map(parseAssignee);
+      const rows = it.assignees.map(a => makeAssignee(a.name, a.qty, a.note));
       const draw = () => {
         editor.innerHTML = '';
         rows.forEach((a, idx) => {
           const el = document.createElement('div');
           el.className = 'ae-row';
           el.innerHTML = `
-            <input class="ae-name" type="text" placeholder="${escapeHtml(t('ae_name_ph'))}" />
-            <input class="ae-qty" type="number" min="1" inputmode="numeric" placeholder="${escapeHtml(t('ae_qty_ph'))}" />
+            <div class="ae-fields">
+              <div class="ae-line">
+                <input class="ae-name" type="text" placeholder="${escapeHtml(t('ae_name_ph'))}" />
+                <input class="ae-qty" type="number" min="1" inputmode="numeric" placeholder="${escapeHtml(t('ae_qty_ph'))}" />
+              </div>
+              <input class="ae-note" type="text" placeholder="${escapeHtml(t('ae_note_ph'))}" />
+            </div>
             <button class="ae-del" aria-label="Remove">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
             </button>
           `;
           const nameEl = el.querySelector('.ae-name');
           const qtyEl = el.querySelector('.ae-qty');
+          const noteEl = el.querySelector('.ae-note');
           nameEl.value = a.name;
           qtyEl.value = a.qty || '';
+          noteEl.value = a.note || '';
           nameEl.addEventListener('input', () => { rows[idx].name = nameEl.value; });
           qtyEl.addEventListener('input', () => {
             const q = parseInt(qtyEl.value, 10);
             rows[idx].qty = (!Number.isNaN(q) && q > 0) ? q : null;
           });
+          noteEl.addEventListener('input', () => { rows[idx].note = noteEl.value; });
           el.querySelector('.ae-del').addEventListener('click', () => {
             rows.splice(idx, 1); draw();
           });
@@ -1350,7 +1502,7 @@
         addBtn.className = 'ae-add';
         addBtn.textContent = t('ae_add');
         addBtn.addEventListener('click', () => {
-          rows.push({ name: '', qty: null });
+          rows.push(makeAssignee());
           draw();
           const inputs = editor.querySelectorAll('.ae-name');
           if (inputs.length) inputs[inputs.length - 1].focus();
@@ -1368,7 +1520,7 @@
         it.note = noteI.value.trim();
         it.assignees = rows
           .filter(a => (a.name || '').trim())
-          .map(a => stringifyAssignee(a));
+          .map(a => makeAssignee(a.name, a.qty, a.note));
         close();
         commit();
       });
@@ -1388,6 +1540,71 @@
   function openConfirmDeleteSheet(onConfirm) {
     openSheet('tpl-confirm-delete-sheet', ({ sheet, close }) => {
       sheet.querySelector('[data-confirm]').addEventListener('click', () => { close(); onConfirm(); });
+    });
+  }
+
+  // Issue #8: overflow sheet with bulk assign & bulk delete actions.
+  function openBulkActionsSheet() {
+    const list = state.list;
+    const n = state.selected.size;
+    if (!list || !n) return;
+    openSheet('tpl-bulk-actions-sheet', ({ sheet, close }) => {
+      sheet.querySelector('.confirm-title').textContent = t('bulk_actions_title', n);
+      const listEl = sheet.querySelector('#bulk-people');
+      listEl.innerHTML = '';
+      const me = (state.me || '').trim();
+      const seen = new Set();
+      const addBtn = (name) => {
+        const key = name.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        const btn = document.createElement('button');
+        btn.className = 'sort-option';
+        btn.textContent = t('assign_to_name', name);
+        btn.addEventListener('click', () => { close(); bulkAssign(name); });
+        listEl.appendChild(btn);
+      };
+      if (me) addBtn(me);
+      for (const nm of uniqueAssigneeNames(list)) addBtn(nm);
+      // "Someone else" - opens a small input sheet.
+      const otherBtn = document.createElement('button');
+      otherBtn.className = 'sort-option';
+      otherBtn.textContent = t('assign_to_other');
+      otherBtn.addEventListener('click', () => {
+        close();
+        openBulkAssignOtherSheet();
+      });
+      listEl.appendChild(otherBtn);
+      // Delete N items.
+      const delBtn = sheet.querySelector('#bulk-delete');
+      delBtn.textContent = t('bulk_delete', n);
+      delBtn.addEventListener('click', () => {
+        close();
+        openBulkDeleteConfirmSheet(n);
+      });
+    });
+  }
+
+  function openBulkAssignOtherSheet() {
+    openSheet('tpl-bulk-other-sheet', ({ sheet, close }) => {
+      const input = sheet.querySelector('#bulk-other-input');
+      setTimeout(() => input.focus(), 60);
+      const confirm = () => {
+        const name = input.value.trim();
+        if (!name) return;
+        close();
+        bulkAssign(name);
+      };
+      sheet.querySelector('[data-confirm]').addEventListener('click', confirm);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); confirm(); } });
+    });
+  }
+
+  function openBulkDeleteConfirmSheet(n) {
+    openSheet('tpl-confirm-bulk-delete-sheet', ({ sheet, close }) => {
+      sheet.querySelector('.confirm-title').textContent = t('confirm_bulk_delete_title', n);
+      sheet.querySelector('[data-confirm]').textContent = t('bulk_delete', n);
+      sheet.querySelector('[data-confirm]').addEventListener('click', () => { close(); bulkDelete(); });
     });
   }
 
