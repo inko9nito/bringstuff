@@ -509,16 +509,20 @@
     if (!id) throw new Error('no id');
     return id;
   }
-  async function kvdbPut(bucketId, payload) {
+  async function kvdbPut(bucketId, payload, keepalive) {
     const r = await fetch(`${API_BASE}/${encodeURIComponent(bucketId)}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
       headers: { 'Content-Type': 'application/json' },
-      // Lets the request keep going after the page that started it is
-      // torn down (see flushRemotePut below) — without this a rename
-      // flushed right as the tab closes/navigates away would just be
-      // aborted mid-flight.
-      keepalive: true,
+      // Only set when flushing right at page teardown (see flushRemotePut
+      // below) — without it there, a save flushed as the tab closes/
+      // navigates away would be aborted mid-flight. Left off the normal
+      // in-page save path: some mobile browsers are flaky about keepalive
+      // fetches outside that narrow teardown case, and a failed keepalive
+      // write here fails silently (the "added" toast already fired
+      // optimistically from local state before this network call even
+      // starts), which is worse than just not having the flag.
+      ...(keepalive ? { keepalive: true } : {}),
     });
     if (!r.ok) throw new Error('put ' + r.status);
   }
@@ -702,9 +706,9 @@
   function scheduleRemotePut(bucketId, list) {
     clearTimeout(putTimer);
     pendingPut = { bucketId, list };
-    putTimer = setTimeout(flushRemotePut, 350);
+    putTimer = setTimeout(() => flushRemotePut(false), 350);
   }
-  function flushRemotePut() {
+  function flushRemotePut(forTeardown) {
     clearTimeout(putTimer);
     putTimer = null;
     if (!pendingPut) return;
@@ -712,7 +716,7 @@
     pendingPut = null;
     const payload = toCompact(list);
     cacheRemote(bucketId, payload);
-    kvdbPut(bucketId, payload).catch(() => {/* ignore transient errors */});
+    kvdbPut(bucketId, payload, !!forTeardown).catch(() => {/* ignore transient errors */});
   }
   // A rename (or any edit) only reaches other devices once the debounce
   // above actually fires — closing the tab, switching away, or locking the
@@ -721,9 +725,9 @@
   // the editing device still shows the new one. Flush immediately the
   // moment the page is hidden or torn down so the edit isn't lost.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushRemotePut();
+    if (document.visibilityState === 'hidden') flushRemotePut(true);
   });
-  window.addEventListener('pagehide', flushRemotePut);
+  window.addEventListener('pagehide', () => flushRemotePut(true));
   // Whether at least one push-panel (item detail, name editor, ...) is
   // currently on top of the list view. While true, that panel is sitting
   // on its own history entry (see openPanel), so replaceState below would
