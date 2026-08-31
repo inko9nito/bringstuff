@@ -52,7 +52,7 @@
         <button class="nav-btn bare" id="btn-back" aria-label="Back">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <div class="spacer"></div>
+        <h1 class="large-title editable" id="list-title" contenteditable="true" spellcheck="false"></h1>
         <div class="lang-toggle" id="lang-toggle">
           <button data-lang="en">EN</button>
           <button data-lang="ru">RU</button>
@@ -61,17 +61,11 @@
           <span id="me-chip-name"></span>
         </button>
       </div>
-      <div class="topbar-title-row title-row-flex" id="title-row">
-        <h1 class="large-title editable" id="list-title" contenteditable="true" spellcheck="false"></h1>
+      <div class="search-row">
+        <svg class="search-row-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="search-input" id="search-input" type="search" data-t-placeholder="search_ph" autocomplete="off" />
-        <button class="nav-btn share-btn icon-only search-clear-btn" id="btn-search-clear" aria-label="Close search">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
-        </button>
-        <button class="nav-btn share-btn icon-only" id="btn-search" aria-label="Search">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </button>
-        <button class="nav-btn share-btn icon-only" id="btn-share" aria-label="Share">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        <button class="search-clear-btn" id="btn-search-clear" aria-label="Clear search" hidden>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
         </button>
       </div>
       <div class="me-row" id="me-row">
@@ -186,12 +180,9 @@
     <div class="push-panel" role="dialog" aria-modal="true">
       <header class="topbar push-topbar">
         <div class="topbar-inner">
-          <button class="nav-btn tint" data-close>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-            <span class="back-label"></span>
-          </button>
+          <button class="nav-btn tint cancel-btn" data-close data-t="cancel"></button>
           <div class="spacer"></div>
-          <button class="nav-btn tint save-btn" data-confirm><b data-t="save"></b></button>
+          <button class="save-btn-primary" data-confirm data-t="save"></button>
         </div>
         <div class="topbar-title-row">
           <h1 class="large-title" data-t="you_are_title"></h1>
@@ -210,10 +201,7 @@
     <div class="push-panel assignee-edit-panel" role="dialog" aria-modal="true">
       <header class="topbar push-topbar">
         <div class="topbar-inner">
-          <button class="nav-btn tint" data-close>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-            <span class="back-label" data-t="back_to_item"></span>
-          </button>
+          <button class="nav-btn tint cancel-btn" data-close data-t="cancel"></button>
           <div class="spacer"></div>
           <button class="save-btn-primary" data-confirm data-t="save"></button>
         </div>

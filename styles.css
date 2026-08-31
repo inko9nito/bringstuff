@@ -196,58 +196,62 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .topbar-title-row .large-title {
   padding: 2px 0;
 }
-/* Title-row with a right-anchored button (Share). Title wraps freely; the
-   button stays pinned to the top-right and never wraps below. */
-.title-row-flex {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-.title-row-flex .large-title {
+/* Issue #84: back + title + lang toggle + name chip share one compact
+   row; the title truncates instead of wrapping or pushing other controls
+   around, and expands back out while it's actually being edited. */
+.topbar-inner .large-title {
   flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
-}
-.title-row-flex .share-btn {
-  flex-shrink: 0;
-  margin-top: 0;
-}
-/* Issue #15: the search button grows into a pill input between the title
-   and the share button. The title stays visible, just yielding room
-   instead of disappearing, matching the requested wireframe. */
-.title-row-flex.searching .large-title {
-  flex: 0 1 auto;
-  max-width: 40%;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.search-input {
-  display: none;
-  min-width: 0;
-  border: 0;
+.topbar-inner .large-title:focus {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+/* Issue #84: search is always present as its own full-width bar — no
+   button to trigger it — with a clear button that only shows once
+   there's a query to clear. */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 max(20px, var(--safe-left)) 12px max(20px, var(--safe-right));
+  padding: 10px 14px;
   background: var(--surface);
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow);
+}
+.search-row-icon { flex-shrink: 0; color: var(--label-tertiary); }
+.search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
   font-size: 16px;
   font-weight: 500;
   color: var(--label);
-  padding: 8px 16px;
-  margin-top: 1px;
+  padding: 0;
 }
 .search-input::placeholder { color: var(--label-tertiary); font-weight: 400; }
 .search-input::-webkit-search-cancel-button { display: none; }
-.search-clear-btn { display: none; }
-.title-row-flex.searching .search-input {
-  display: block;
-  flex: 1 1 auto;
-}
-.title-row-flex.searching .search-clear-btn {
+.search-clear-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--fill-tertiary);
+  color: var(--label-secondary);
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.title-row-flex.searching #btn-search {
-  display: none;
-}
+.search-clear-btn:active { opacity: 0.7; }
 .large-title.editable {
   outline: none;
   border-radius: 8px;
@@ -1100,10 +1104,6 @@ input:focus, textarea:focus, [contenteditable]:focus {
   resize: vertical;
 }
 .ae-note-area::placeholder { color: var(--label-tertiary); }
-.push-topbar .nav-btn.tint .back-label {
-  font-size: 17px;
-  font-weight: 500;
-}
 
 /* ---------- Push panel (iOS-style item detail) ---------- */
 .push-panel {
@@ -1129,14 +1129,6 @@ input:focus, textarea:focus, [contenteditable]:focus {
 }
 .push-topbar .nav-btn.tint { background: transparent; box-shadow: none; padding: 8px 10px; }
 .push-topbar .nav-btn.tint:active { opacity: 0.55; }
-.push-topbar .nav-btn.tint .back-label {
-  font-size: 17px;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 40vw;
-}
 .push-topbar .cancel-btn {
   font-size: 17px;
   font-weight: 500;
@@ -1269,11 +1261,15 @@ input:focus, textarea:focus, [contenteditable]:focus {
 }
 .pill.overflow svg { display: block; }
 /* Let the primary assign pill shrink its text so the overflow circle
-   stays fully on-screen and tappable on narrow phones. */
+   stays fully on-screen and tappable on narrow phones. Issue #50: also
+   left-aligns count + Clear against right-aligned action buttons by
+   pushing this pill (and everything after it) to the right, letting the
+   gap between them absorb the bar's full width. */
 .selection-bar .pill.primary {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-left: auto;
 }
 .selection-bar { flex-wrap: nowrap; }
 @media (min-width: 720px) {
