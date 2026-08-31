@@ -458,38 +458,35 @@
       })),
     };
   }
-  // ---------- Remote storage (kvdb.io) ----------
-  // Each list gets its own kvdb bucket the first time it's created; we PUT
+  // ---------- Remote storage (Netlify Function + Blobs) ----------
+  // Each list gets its own bucket the first time it's created; we PUT
   // updates into the bucket on every commit and GET them back on load. The
   // shareable URL becomes  #/{slug}~{bucketId}  — short, human-readable, and
   // real live collaboration between anyone with the link.
   //
-  // Fallback: if kvdb is unreachable (network offline / service down), we
-  // silently drop back to the old #/z/... self-contained compressed URL so
-  // the app keeps working, and stash a local copy in localStorage so a
-  // remote-backed list can still be read on the creating device.
-  const KVDB_BASE = 'https://kvdb.io';
-  const KVDB_KEY = 'v1';
+  // Fallback: if the backend is unreachable, we silently drop back to the
+  // old #/z/... self-contained compressed URL so the app keeps working, and
+  // stash a local copy in localStorage so a remote-backed list can still be
+  // read on the creating device.
+  const API_BASE = '/.netlify/functions/lists';
 
   async function kvdbCreate() {
-    const r = await fetch(KVDB_BASE + '/', { method: 'POST' });
-    if (!r.ok) throw new Error('kvdb create ' + r.status);
-    const text = (await r.text()).trim();
-    // Response body is the full bucket URL.
-    const id = text.replace(/^https?:\/\/[^/]+\//, '').replace(/\/$/, '');
-    if (!id) throw new Error('kvdb no id');
+    const r = await fetch(API_BASE, { method: 'POST' });
+    if (!r.ok) throw new Error('create ' + r.status);
+    const id = (await r.text()).trim();
+    if (!id) throw new Error('no id');
     return id;
   }
   async function kvdbPut(bucketId, payload) {
-    const r = await fetch(`${KVDB_BASE}/${encodeURIComponent(bucketId)}/${KVDB_KEY}`, {
+    const r = await fetch(`${API_BASE}/${encodeURIComponent(bucketId)}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
       headers: { 'Content-Type': 'application/json' },
     });
-    if (!r.ok) throw new Error('kvdb put ' + r.status);
+    if (!r.ok) throw new Error('put ' + r.status);
   }
   async function kvdbGet(bucketId) {
-    const r = await fetch(`${KVDB_BASE}/${encodeURIComponent(bucketId)}/${KVDB_KEY}`);
+    const r = await fetch(`${API_BASE}/${encodeURIComponent(bucketId)}`);
     if (!r.ok) return null;
     const txt = await r.text();
     if (!txt) return null;
