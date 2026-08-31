@@ -79,11 +79,6 @@
       paste_hint: 'One item per line. Lines with <span class="mono-chip">✅ Name</span> get assigned automatically.',
       paste_example: 'Charcoal ✅ Bella\nLighter fluid\nBuns for burgers x8',
       replace_existing: 'Replace existing items',
-      share_sheet_title: 'Share list',
-      share_hint: "The whole list travels inside the link. Send it to friends — when they change something, they'll get a new link they can share back.",
-      copy_link: 'Copy link',
-      share_ellipsis: 'Share…',
-      url_length: (n) => `${n.toLocaleString()} characters in link`,
       edit_item: 'Edit item',
       field_name: 'Name',
       field_qty: 'Total quantity (optional)',
@@ -189,11 +184,6 @@
       paste_hint: 'По одному пункту на строку. Строки с <span class="mono-chip">✅ Имя</span> сразу закрепляются.',
       paste_example: 'Уголь ✅ Бэлла\nЖидкость для розжига\nБулочки x8',
       replace_existing: 'Заменить существующие',
-      share_sheet_title: 'Поделиться',
-      share_hint: 'Весь список внутри ссылки. Отправь её друзьям — когда они что-то изменят, получат новую ссылку, чтобы поделиться в ответ.',
-      copy_link: 'Скопировать ссылку',
-      share_ellipsis: 'Поделиться…',
-      url_length: (n) => `${n.toLocaleString()} символов в ссылке`,
       edit_item: 'Редактировать',
       field_name: 'Название',
       field_qty: 'Общее количество (по желанию)',
@@ -898,7 +888,7 @@
     meChip.addEventListener('click', () => openNameView(updateMeChip));
 
     $('#btn-back').addEventListener('click', () => navHome());
-    $('#btn-share').addEventListener('click', () => openShareSheet());
+    $('#btn-share').addEventListener('click', () => copyShareLink(list));
 
     // Issue #23: + button in the title row jumps to the add-item field.
     const addScrollBtn = $('#btn-add-scroll');
@@ -1300,32 +1290,33 @@
     });
   }
 
-  function openShareSheet() {
-    openSheet('tpl-share-sheet', ({ sheet }) => {
-      const url = location.href;
-      sheet.querySelector('#share-url').textContent = url;
-      sheet.querySelector('#url-length').textContent = t('url_length', url.length);
-      const copyBtn = sheet.querySelector('#btn-copy');
-      copyBtn.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(url); showToast(t('toast_link_copied')); }
-        catch {
-          const ta = document.createElement('textarea');
-          ta.value = url;
-          document.body.appendChild(ta);
-          ta.select();
-          try { document.execCommand('copy'); showToast(t('toast_link_copied')); }
-          catch { showToast(t('toast_copy_failed')); }
-          document.body.removeChild(ta);
-        }
-      });
-      const nativeBtn = sheet.querySelector('#btn-native-share');
-      if (navigator.share) {
-        nativeBtn.hidden = false;
-        nativeBtn.addEventListener('click', async () => {
-          try { await navigator.share({ title: state.list.name, url }); } catch {}
-        });
-      }
-    });
+  // Pinned share URLs by lowercased list name. Lets specific lists hand out
+  // a canonical URL (e.g. the Netlify-backed one) even when opened on the
+  // legacy GH Pages origin, so friends still on the old link converge onto
+  // the durable backend.
+  const PINNED_SHARE_URLS = {
+    'отдых': 'https://bringstuff.netlify.app/#/otdyh-202608~zbz6gtju8m',
+    '🏕️ отдых': 'https://bringstuff.netlify.app/#/otdyh-202608~zbz6gtju8m',
+  };
+  function shareUrlFor(list) {
+    const key = String(list?.name || '').trim().toLowerCase();
+    return PINNED_SHARE_URLS[key] || location.href;
+  }
+
+  async function copyShareLink(list) {
+    const url = shareUrlFor(list);
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast(t('toast_link_copied'));
+      return;
+    } catch {}
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showToast(t('toast_link_copied')); }
+    catch { showToast(t('toast_copy_failed')); }
+    document.body.removeChild(ta);
   }
 
   // ---------- Push panel (iOS-style nav stack) ----------
