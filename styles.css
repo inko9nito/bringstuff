@@ -1223,6 +1223,38 @@ input:focus, textarea:focus, [contenteditable]:focus {
   flex: 1;
   padding-bottom: 12px;
 }
+/* Issue #62: fields sat too close together — double the gap between them. */
+.item-detail-panel .field-label {
+  padding-top: 28px;
+}
+.item-detail-panel .row-input.solo {
+  margin-bottom: 12px;
+}
+/* Issue #62: quantity moves inline with the item name and stays narrow
+   since it only ever holds a short number. */
+.item-topline {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.item-topline-name {
+  flex: 1;
+  min-width: 0;
+}
+.item-topline-qty {
+  flex: 0 0 84px;
+}
+.item-topline-qty .row-input.solo {
+  text-align: center;
+}
+/* Issue #62: a taller textarea reads as a note rather than a name field —
+   roughly double the previous single-line input's height. */
+.item-note-area {
+  min-height: 96px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.4;
+}
 .delete-anchor {
   border-top: 0.5px solid var(--separator);
   padding: 12px max(20px, var(--safe-left)) calc(16px + var(--safe-bottom)) max(20px, var(--safe-right));
