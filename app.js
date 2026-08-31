@@ -88,6 +88,7 @@
       toast_deleted: 'Item deleted',
       toast_link_copied: 'Link copied',
       toast_copy_failed: 'Copy failed',
+      toast_link_shortened: 'Link shortened',
       toast_no_items: 'No items detected',
       toast_enter_name: 'Enter your name first',
       toast_name_required: 'Name required',
@@ -171,6 +172,7 @@
       toast_deleted: 'Удалено',
       toast_link_copied: 'Ссылка скопирована',
       toast_copy_failed: 'Не удалось скопировать',
+      toast_link_shortened: 'Ссылка укорочена',
       toast_no_items: 'Не найдено ни одного пункта',
       toast_enter_name: 'Сначала введи имя',
       toast_name_required: 'Нужно название',
@@ -555,6 +557,30 @@
       }
     })();
   }
+  // Migrate a list that came in through a legacy #/l/ or #/z/ URL to a
+  // fresh kvdb bucket, then quietly replace the URL with the new short
+  // slug form. Fails silently if the store is unreachable.
+  async function migrateEncodedToRemote(list) {
+    // Don't attempt if the network is offline or we already migrated.
+    if (state.bucketId) return;
+    try {
+      const bucketId = await kvdbCreate();
+      const payload = toCompact(list);
+      await kvdbPut(bucketId, payload);
+      cacheRemote(bucketId, payload);
+      state.bucketId = bucketId;
+      state.slug = makeSlug(list.name, list.updatedAt);
+      state.currentHashKey = 'r:' + bucketId;
+      rememberList(list, null);
+      const newHash = slugHash(state.slug, bucketId);
+      history.replaceState(null, '', location.pathname + location.search + newHash);
+      showToast(t('toast_link_shortened'));
+    } catch {
+      // Leave the legacy URL alone; the user can retry by opening the share
+      // sheet later, or the site will retry on next load.
+    }
+  }
+
   // Debounced background PUT so rapid edits coalesce.
   let putTimer = null;
   function scheduleRemotePut(bucketId, list) {
@@ -666,6 +692,9 @@
         state.currentHashKey = hashKey;
         rememberList(list, { scheme: route.scheme, text: route.data });
         renderList();
+        // Auto-migrate legacy long URLs onto a fresh kvdb bucket so the
+        // shareable URL becomes the new short slug form.
+        migrateEncodedToRemote(list);
       });
       return;
     }
