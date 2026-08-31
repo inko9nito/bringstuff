@@ -1230,21 +1230,12 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .item-detail-panel .row-input.solo {
   margin-bottom: 12px;
 }
-/* Issue #62: quantity moves inline with the item name and stays narrow
-   since it only ever holds a short number. */
-.item-topline {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-.item-topline-name {
-  flex: 1;
-  min-width: 0;
-}
-.item-topline-qty {
-  flex: 0 0 84px;
-}
-.item-topline-qty .row-input.solo {
+/* Issue #62 follow-up: quantity moved back to its own row below the item
+   name (inline made the qty label wrap awkwardly); field is 50% of the
+   screen width so it still reads as short. */
+.row-input.half-width {
+  width: 50vw;
+  max-width: 100%;
   text-align: center;
 }
 /* Issue #62: a taller textarea reads as a note rather than a name field —
