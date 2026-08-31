@@ -3,7 +3,6 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - claude/shopping-list-app-d9w5s0
       - main
   workflow_dispatch:
 
