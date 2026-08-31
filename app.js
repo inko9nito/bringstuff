@@ -48,6 +48,7 @@
       filter_open: 'Not taken',
       filter_mine: 'Mine',
       filter_taken: 'Taken',
+      search_ph: 'Search',
       add_item_ph: 'Add items — one per line…',
       add_n_items: (n) => `Add ${n} items`,
       qty_ph: 'Qty',
@@ -93,6 +94,7 @@
       ae_name_ph: 'Name',
       ae_qty_ph: 'Qty',
       ae_add: '+ Add person',
+      ae_assign_other: 'Assign to…',
       no_matches: 'No matches',
       no_matches_hint: 'Try a different filter.',
       empty_title: 'Nothing here yet',
@@ -142,6 +144,7 @@
       filter_open: 'Свободно',
       filter_mine: 'Моё',
       filter_taken: 'Занято',
+      search_ph: 'Поиск',
       change_name: 'Изменить имя',
       you_are_title: 'Твоё имя',
       you_are_hint: 'Имя сохраняется на этом устройстве и показывается рядом с тем, что ты везёшь.',
@@ -207,6 +210,7 @@
       ae_name_ph: 'Имя',
       ae_qty_ph: 'Кол.',
       ae_add: '+ Добавить',
+      ae_assign_other: 'Назначить…',
       no_matches: 'Ничего не найдено',
       no_matches_hint: 'Попробуй другой фильтр.',
       empty_title: 'Пока пусто',
@@ -735,6 +739,7 @@
     me: '',
     filter: 'all',
     filterPerson: '',
+    search: '',
     sort: 'date_asc',
     selected: new Set(),
     sheet: null,
@@ -777,6 +782,7 @@
       if (cached) {
         state.list = fromCompact(cached);
         state.selected = new Set();
+        state.search = '';
         state.currentHashKey = hashKey;
         renderList();
       }
@@ -827,6 +833,7 @@
         if (!list) { showToast(t('toast_invalid_link')); navHome(); return; }
         state.list = list;
         state.selected = new Set();
+        state.search = '';
         state.currentHashKey = hashKey;
         rememberList(list, { scheme: route.scheme, text: route.data });
         renderList();
@@ -852,6 +859,7 @@
         if (list) {
           state.list = list;
           state.selected = new Set();
+          state.search = '';
           state.bucketId = null; state.slug = null;
           state.currentHashKey = 'snap:' + route.id;
           renderList();
@@ -879,6 +887,7 @@
       const list = emptyList(nameInput.value.trim() || t('default_list_name'));
       state.list = list;
       state.selected = new Set();
+      state.search = '';
       rememberList(list);
       navList(list);
     });
@@ -975,6 +984,45 @@
     $('#btn-back').addEventListener('click', () => navHome());
     $('#btn-share').addEventListener('click', () => copyShareLink(list));
 
+    // Issue #15: search grows the button into an input between the list
+    // name and the share button, filtering items by name/note as you type.
+    const titleRow = $('#title-row');
+    const searchBtn = $('#btn-search');
+    const searchInput = $('#search-input');
+    const openSearch = () => {
+      titleRow.classList.add('searching');
+      searchBtn.classList.add('active');
+      searchInput.focus();
+    };
+    const closeSearch = () => {
+      titleRow.classList.remove('searching');
+      searchBtn.classList.remove('active');
+      if (state.search) {
+        state.search = '';
+        searchInput.value = '';
+        renderItems();
+      }
+    };
+    // Re-render may run while a search is already active (e.g. checking an
+    // item off mid-search) — restore the UI to match state.search instead
+    // of resetting it.
+    if (state.search) {
+      titleRow.classList.add('searching');
+      searchBtn.classList.add('active');
+      searchInput.value = state.search;
+    }
+    searchBtn.addEventListener('click', () => {
+      if (titleRow.classList.contains('searching')) closeSearch();
+      else openSearch();
+    });
+    searchInput.addEventListener('input', () => {
+      state.search = searchInput.value;
+      renderItems();
+    });
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
+    });
+
     // Issue #12: sort chip opens a bottom-sheet with sort options.
     const sortBtn = $('#btn-sort');
     if (sortBtn) sortBtn.addEventListener('click', () => openSortSheet());
@@ -1056,6 +1104,13 @@
   }
 
   function itemMatchesFilter(it) {
+    // Issue #15: search narrows within whatever filter tab is active,
+    // matching against the item's name and its note ("description").
+    const q = (state.search || '').trim().toLowerCase();
+    if (q) {
+      const hay = `${it.name || ''} ${it.note || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
     const me = (state.me || '').trim().toLowerCase();
     const hasMe = () => me && it.assignees.some(a => a.name.toLowerCase() === me);
     switch (state.filter) {
@@ -1675,9 +1730,28 @@
           });
           editor.appendChild(el);
         });
+        // Issue #56: quick "Assign to me" next to the existing "Assign to…"
+        // flow, so claiming an item doesn't require typing your own name.
+        const quickRow = document.createElement('div');
+        quickRow.className = 'ae-quick-row';
+
+        const meBtn = document.createElement('button');
+        meBtn.className = 'ae-add';
+        meBtn.textContent = t('assign_to');
+        const me = (state.me || '').trim();
+        const alreadyMine = me && rows.some(a => (a.name || '').trim().toLowerCase() === me.toLowerCase());
+        meBtn.disabled = !!alreadyMine;
+        meBtn.addEventListener('click', () => {
+          const name = (state.me || '').trim();
+          if (!name) { showToast(t('toast_enter_name')); return; }
+          rows.push(makeAssignee(name));
+          draw();
+        });
+        quickRow.appendChild(meBtn);
+
         const addBtn = document.createElement('button');
         addBtn.className = 'ae-add';
-        addBtn.textContent = t('ae_add');
+        addBtn.textContent = t('ae_assign_other');
         addBtn.addEventListener('click', () => {
           const fresh = makeAssignee();
           openAssigneeView(fresh, (updated) => {
@@ -1688,7 +1762,9 @@
             }
           });
         });
-        editor.appendChild(addBtn);
+        quickRow.appendChild(addBtn);
+
+        editor.appendChild(quickRow);
       };
       draw();
 
