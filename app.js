@@ -506,6 +506,11 @@
       method: 'PUT',
       body: JSON.stringify(payload),
       headers: { 'Content-Type': 'application/json' },
+      // Lets the request keep going after the page that started it is
+      // torn down (see flushRemotePut below) — without this a rename
+      // flushed right as the tab closes/navigates away would just be
+      // aborted mid-flight.
+      keepalive: true,
     });
     if (!r.ok) throw new Error('put ' + r.status);
   }
@@ -673,14 +678,32 @@
 
   // Debounced background PUT so rapid edits coalesce.
   let putTimer = null;
+  let pendingPut = null; // { bucketId, list } awaiting the debounced flush below
   function scheduleRemotePut(bucketId, list) {
     clearTimeout(putTimer);
-    putTimer = setTimeout(() => {
-      const payload = toCompact(list);
-      cacheRemote(bucketId, payload);
-      kvdbPut(bucketId, payload).catch(() => {/* ignore transient errors */});
-    }, 350);
+    pendingPut = { bucketId, list };
+    putTimer = setTimeout(flushRemotePut, 350);
   }
+  function flushRemotePut() {
+    clearTimeout(putTimer);
+    putTimer = null;
+    if (!pendingPut) return;
+    const { bucketId, list } = pendingPut;
+    pendingPut = null;
+    const payload = toCompact(list);
+    cacheRemote(bucketId, payload);
+    kvdbPut(bucketId, payload).catch(() => {/* ignore transient errors */});
+  }
+  // A rename (or any edit) only reaches other devices once the debounce
+  // above actually fires — closing the tab, switching away, or locking the
+  // phone in that 350ms window drops the pending PUT entirely, so the
+  // shared bucket silently keeps serving the previous name/content while
+  // the editing device still shows the new one. Flush immediately the
+  // moment the page is hidden or torn down so the edit isn't lost.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushRemotePut();
+  });
+  window.addEventListener('pagehide', flushRemotePut);
   // Whether at least one push-panel (item detail, name editor, ...) is
   // currently on top of the list view. While true, that panel is sitting
   // on its own history entry (see openPanel), so replaceState below would
