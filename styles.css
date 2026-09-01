@@ -380,7 +380,7 @@ input:focus, textarea:focus, [contenteditable]:focus {
 .chip {
   flex-shrink: 0;
   scroll-snap-align: start;
-  padding: 5px 12px;
+  padding: 5px 9px;
   font-size: 12px;
   font-weight: 600;
   color: var(--label);
@@ -389,13 +389,9 @@ input:focus, textarea:focus, [contenteditable]:focus {
   min-height: 28px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   box-shadow: var(--shadow);
   transition: transform 0.12s;
-}
-.chip .count {
-  padding: 0 6px;
-  font-size: 11px;
 }
 .chip:active { transform: scale(0.96); }
 .chip.active {
@@ -403,15 +399,11 @@ input:focus, textarea:focus, [contenteditable]:focus {
   color: var(--surface);
 }
 .chip .count {
-  padding: 1px 7px;
   font-size: 12px;
   font-weight: 700;
-  background: var(--fill-tertiary);
-  border-radius: var(--radius-pill);
   color: var(--label-secondary);
 }
 .chip.active .count {
-  background: rgba(255,255,255,0.16);
   color: var(--surface);
 }
 
@@ -1369,20 +1361,24 @@ input:focus, textarea:focus, [contenteditable]:focus {
   margin-left: auto;
 }
 .selection-bar { flex-wrap: nowrap; }
-@media (min-width: 720px) {
+@media (min-width: 900px) {
   .push-panel {
     /* Issue #76: left:50% alone still leaves the inset:0 base rule's
        right:0 in play, so the panel resolved to half the viewport instead
        of filling up to the cap. Pin width explicitly so it fills like the
-       rest of the app, just clamped and centered on wide viewports. */
+       rest of the app, just clamped and centered on wide viewports.
+       Issue #96: this used to clamp at 720px while #app/.sheet only clamp
+       at 900px, so between 720-900px the panel shrank to a centered column
+       while the full-width app underneath still showed on both sides. Match
+       the 900px breakpoint used everywhere else. The left/right dividers
+       are gone too — the surrounding background is the same colour as the
+       panel at this width, so no divider is needed. */
     width: 100%;
     max-width: 640px;
     left: 50%;
     right: auto;
     transform: translateX(-50%);
     animation: pushInCentered 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.02);
-    border-left: 0.5px solid var(--separator);
-    border-right: 0.5px solid var(--separator);
   }
   .push-panel.closing {
     animation: pushOutCentered 0.24s cubic-bezier(0.4, 0, 0.9, 0.4) forwards;
