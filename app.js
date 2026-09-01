@@ -779,7 +779,7 @@
       const s = localStorage.getItem(SORT_KEY);
       if (s === 'date_asc' || s === 'date_desc' || s === 'alpha_asc' || s === 'alpha_desc') return s;
     } catch {}
-    return 'date_asc';
+    return 'date_desc';
   }
   function saveSort(s) { try { localStorage.setItem(SORT_KEY, s); } catch {} }
 
@@ -790,7 +790,7 @@
     filter: 'all',
     filterPerson: '',
     search: '',
-    sort: 'date_asc',
+    sort: 'date_desc',
     selected: new Set(),
     sheet: null,
     panel: null,
